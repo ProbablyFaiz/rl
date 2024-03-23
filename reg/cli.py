@@ -81,7 +81,7 @@ def cli():
 @click.option(
     "--cpus",
     "-c",
-    help="Number of CPUs per GPU",
+    help="Number of CPUs",
     default=4,
     show_default=True,
     type=int,
@@ -114,6 +114,7 @@ def job(
 
     if partition == "owners":
         create_batch_job(name, gpus, cpus, mem, time)
+        return
 
     rich.print("[green]Starting interactive job...[/green]")
     srun_args = [
@@ -124,7 +125,7 @@ def job(
         name,
         "--gpus",
         str(gpus),
-        "--cpus-per-gpu",
+        "--cpus-per-task",
         str(cpus),
         "--mem",
         mem,
@@ -133,6 +134,7 @@ def job(
         "--pty",
         SHELL_PATH,
     ]
+    # Show the output to the user
     subprocess.run(srun_args)
 
 
@@ -154,7 +156,7 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
         CURRENT_GROUP,
         "--gpus",
         str(gpus),
-        "--cpus-per-gpu",
+        "--cpus-per-task",
         str(cpus),
         "--mem",
         mem,
