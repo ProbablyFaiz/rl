@@ -79,6 +79,14 @@ def cli():
     type=int,
 )
 @click.option(
+    "--gpu-mem",
+    "-gm",
+    help="GPU Memory",
+    default="80GB",
+    show_default=True,
+    type=str,
+)
+@click.option(
     "--cpus",
     "-c",
     help="Number of CPUs",
@@ -112,33 +120,42 @@ def job(
 ):
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
-    if partition == "owners":
-        create_batch_job(name, gpus, cpus, mem, time)
-        return
-
-    rich.print("[green]Starting interactive job...[/green]")
-    srun_args = [
-        "srun",
+    common_args = [
         "--partition",
         partition,
-        "--job-name",
+        "--name",
         name,
+        "-C",
+        f"GPU_MEM:{mem}",
+        "--gpu_cmode",
+        "shared",
         "--gpus",
         str(gpus),
-        "--cpus-per-task",
+        "--cpus",
         str(cpus),
         "--mem",
         mem,
         "--time",
         time,
-        "--pty",
-        SHELL_PATH,
     ]
+
+    if partition == "owners":
+        create_batch_job(common_args, time)
+        return
+
+    rich.print("[green]Starting interactive job...[/green]")
     # Show the output to the user
-    subprocess.run(srun_args)
+    subprocess.run(
+        [
+            "srun",
+            *common_args,
+            "--pty",
+            SHELL_PATH,
+        ]
+    )
 
 
-def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
+def create_batch_job(sbatch_args, job_time):
     parsed_time = [int(x) for x in job_time.split(":")]
     sleep_time = 0
     for i, t in enumerate(reversed(parsed_time)):
@@ -146,22 +163,7 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
 
     sbatch_args = [
         "sbatch",
-        "--job-name",
-        name,
-        "--output",
-        LOG_DIR / f"{name}.out",
-        "--error",
-        LOG_DIR / f"{name}.err",
-        "--time",
-        job_time,
-        "--partition",
-        "owners",
-        "--gpus",
-        str(gpus),
-        "--cpus-per-task",
-        str(cpus),
-        "--mem",
-        mem,
+        *sbatch_args,
         "--wrap",
         f"python -c 'import time; time.sleep({sleep_time})'",
     ]
