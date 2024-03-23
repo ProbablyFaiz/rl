@@ -29,20 +29,6 @@ LOG_DIR = Path("/scratch/users") / CURRENT_USER / "logs"
 
 CHECK_BATCH_EVERY = 10
 
-
-SBATCH_TEMPLATE = """#!/usr/bin/bash
-#SBATCH --job-name={job_name}
-#SBATCH --output={output}
-#SBATCH --error={error}
-#SBATCH --time={time}
-#SBATCH -p {partition}
-#SBATCH --gpus {gpus}
-#SBATCH --cpus-per-gpu {cpus_per_gpu}
-#SBATCH --mem={mem}
-sleep {sleep}
-"""
-
-
 DEFAULT_JOB_NAME = (
     f"interactive-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
 )
@@ -89,7 +75,7 @@ def cli():
 @click.option(
     "--cpus",
     "-c",
-    help="Number of CPUs",
+    help="Number of CPUs per GPU",
     default=4,
     show_default=True,
     type=int,
@@ -132,7 +118,7 @@ def job(
         "shared",
         "--gpus",
         str(gpus),
-        "--cpus-per-task",
+        "--cpus-per-gpu" if gpus else "--cpus",
         str(cpus),
         "--mem",
         mem,
