@@ -78,7 +78,8 @@ def cli():
     type=int,
 )
 @click.option(
-    "--cpus" "-c",
+    "--cpus",
+    "-c",
     help="Number of CPUs per GPU",
     default=4,
     show_default=True,
