@@ -79,10 +79,10 @@ def cli():
     type=int,
 )
 @click.option(
-    "--gpu-mem",
-    "-gm",
-    help="GPU Memory",
-    default="80GB",
+    "--gpu-constraint",
+    "-gc",
+    help="GPU constraint",
+    default="GPU_MEM:40GB|GPU_MEM:80GB",
     show_default=True,
     type=str,
 )
@@ -114,6 +114,7 @@ def job(
     partition: str,
     name: str,
     gpus: int,
+    gpu_constraint: str,
     cpus: int,
     mem: str,
     time: str,
@@ -123,15 +124,15 @@ def job(
     common_args = [
         "--partition",
         partition,
-        "--name",
+        "--job-name",
         name,
         "-C",
-        f"GPU_MEM:{mem}",
+        gpu_constraint,
         "--gpu_cmode",
         "shared",
         "--gpus",
         str(gpus),
-        "--cpus",
+        "--cpus-per-task",
         str(cpus),
         "--mem",
         mem,
@@ -140,7 +141,7 @@ def job(
     ]
 
     if partition == "owners":
-        create_batch_job(common_args, time)
+        create_batch_job(common_args, name, time)
         return
 
     rich.print("[green]Starting interactive job...[/green]")
@@ -155,7 +156,7 @@ def job(
     )
 
 
-def create_batch_job(sbatch_args, job_time):
+def create_batch_job(sbatch_args, name, job_time):
     parsed_time = [int(x) for x in job_time.split(":")]
     sleep_time = 0
     for i, t in enumerate(reversed(parsed_time)):
