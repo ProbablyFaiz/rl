@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 import click
+import rich
 import rich.progress
 
 CURRENT_USER = subprocess.run(
@@ -114,6 +115,7 @@ def job(
     if partition == "owners":
         create_batch_job(name, gpus, cpus, mem, time)
 
+    rich.print("[green]Starting interactive job...[/green]")
     srun_args = [
         "srun",
         "--partition",
@@ -181,7 +183,7 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
                 progress.update(task, completed=1)
                 break
 
-    rich.print(f"Job started on node {job_node}. SSHing into node...")
+    rich.print(f"[green]Job started on node {job_node}. SSHing into node...[/green]")
     ssh_args = [
         SSH_PATH,
         job_node,
