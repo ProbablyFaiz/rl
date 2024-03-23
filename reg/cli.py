@@ -155,7 +155,7 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
         "--time",
         job_time,
         "--partition",
-        CURRENT_GROUP,
+        "owners",
         "--gpus",
         str(gpus),
         "--cpus-per-task",
@@ -182,8 +182,8 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
                 raise Exception(
                     "Job not found when checking status with squeue, what happened?"
                 )
-            job_node = job_info[7]
             if job_info[4] == "R":
+                job_node = job_info[7]
                 progress.update(task, completed=1)
                 break
 
