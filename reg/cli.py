@@ -172,7 +172,7 @@ def create_batch_job(sbatch_args, name, job_time):
 
     job_node, job_id = None, None
     with rich.progress.Progress(transient=True) as progress:
-        task = progress.add_task("[green]Waiting for job to start...", total=None)
+        task = progress.add_task("[green]Waiting for job to start...", start=True, total=None)
         while True:
             time.sleep(CHECK_BATCH_EVERY)
             job_info = subprocess.run(
