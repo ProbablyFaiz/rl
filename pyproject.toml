@@ -1,0 +1,36 @@
+[project]
+name = "reg"
+version = "0.1.0"
+authors = [
+    { name = "Faiz Surani", email = "faiz@law.stanford.edu" },
+]
+description = "A CLI for various RegLab / Sherlock tasks"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "click"
+]
+
+[project.urls]
+homepage = "https://github.com/reglab/better-python"
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+reg = "reg.cli:cli"
+
+[tool.setuptools]
+packages = ["reg"]
+
+[tool.isort]
+profile = "black"
+src_paths = ["reg"]
+skip_gitignore = true
