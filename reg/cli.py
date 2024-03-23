@@ -167,7 +167,7 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
     ]
     subprocess.run(sbatch_args, check=True)
 
-    job_node = None
+    job_node, job_id = None, None
     with rich.progress.Progress(transient=True) as progress:
         task = progress.add_task("[green]Waiting for job to start...", total=None)
         while True:
@@ -183,16 +183,23 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
                     "Job not found when checking status with squeue, what happened?"
                 )
             if job_info[4] == "R":
-                job_node = job_info[7]
+                job_node, job_id = job_info[7], job_info[0]
                 progress.update(task, completed=1)
                 break
 
-    rich.print(f"[green]Job started on node {job_node}. SSHing into node...[/green]")
+    rich.print(
+        f"[green]Job {job_id} started on node {job_node}. SSHing into node...[/green]"
+    )
     ssh_args = [
         SSH_PATH,
         job_node,
     ]
     subprocess.run(ssh_args)
+    if click.confirm("Left the job, do you want to cancel it?"):
+        subprocess.run(["scancel", job_id])
+        rich.print("[red]Job ended[/red]")
+    else:
+        rich.print(f"[green]Job {job_id} will continue running[/green]")
 
 
 if __name__ == "__main__":
