@@ -163,7 +163,7 @@ def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
         "--mem",
         mem,
         "--wrap",
-        f"sleep {sleep_time}",
+        f"python -c 'import time; time.sleep({sleep_time})'",
     ]
     subprocess.run(sbatch_args, check=True)
 
