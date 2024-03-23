@@ -58,6 +58,7 @@ def cli():
     "-p",
     help="Partition. If 'owners' specified, will create a batch job then ssh into it",
     default=CURRENT_GROUP,
+    show_default=True,
     type=str,
 )
 @click.option(
@@ -65,6 +66,7 @@ def cli():
     "-n",
     help="Name of the job",
     default=DEFAULT_JOB_NAME,
+    show_default=True,
     type=str,
 )
 @click.option(
@@ -72,12 +74,14 @@ def cli():
     "-g",
     help="Number of GPUs",
     default=1,
+    show_default=True,
     type=int,
 )
 @click.option(
     "--cpus" "-c",
     help="Number of CPUs per GPU",
     default=4,
+    show_default=True,
     type=int,
 )
 @click.option(
@@ -85,6 +89,7 @@ def cli():
     "-m",
     help="Memory",
     default="32GB",
+    show_default=True,
     type=str,
 )
 @click.option(
@@ -92,6 +97,7 @@ def cli():
     "-t",
     help="Time",
     default="24:00:00",
+    show_default=True,
     type=str,
 )
 def job(
