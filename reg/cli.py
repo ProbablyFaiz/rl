@@ -139,8 +139,10 @@ def job(
 
 
 def create_batch_job(name: str, gpus: int, cpus: int, mem: str, job_time: str):
-    parsed_time = datetime.datetime.strptime(job_time, "%H:%M:%S")
-    sleep_time = parsed_time.hour * 3600 + parsed_time.minute * 60 + parsed_time.second
+    parsed_time = [int(x) for x in job_time.split(":")]
+    sleep_time = 0
+    for i, t in enumerate(reversed(parsed_time)):
+        sleep_time += t * 60**i
 
     sbatch_args = [
         "sbatch",
