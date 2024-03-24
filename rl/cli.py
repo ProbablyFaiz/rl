@@ -193,9 +193,7 @@ def create_batch_job(sbatch_args, name, job_time):
         rich.print(f"[green]Job {job_id} will continue running[/green]")
 
 
-@cli.command(
-    help="Modify files or directories (and then undo) so that Sherlock won't delete them"
-)
+@cli.command(short_help="Temporarily modify files to avoid Sherlock auto-deletion")
 @click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
 @click.option(
     "--recursive",
