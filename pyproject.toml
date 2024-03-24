@@ -1,5 +1,5 @@
 [project]
-name = "reg"
+name = "rl"
 version = "0.1.0"
 authors = [
     { name = "Faiz Surani", email = "faiz@law.stanford.edu" },
@@ -12,26 +12,26 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.6"
 dependencies = [
-    "click"
+    "click",
+    "rich"
 ]
 
 [project.urls]
-homepage = "https://github.com/reglab/better-python"
+homepage = "https://github.com/reglab/rl"
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-reg = "reg.cli:cli"
-rl = "reg.cli:cli"
+rl = "rl.cli:cli"
 
 [tool.setuptools]
-packages = ["reg"]
+packages = ["rl"]
 
 [tool.isort]
 profile = "black"
-src_paths = ["reg"]
+src_paths = ["rl"]
 skip_gitignore = true
