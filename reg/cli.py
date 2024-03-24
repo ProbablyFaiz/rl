@@ -158,7 +158,9 @@ def create_batch_job(sbatch_args, name, job_time):
 
     job_node, job_id = None, None
     with rich.progress.Progress(transient=True) as progress:
-        task = progress.add_task("[green]Waiting for job to start...", start=True, total=None)
+        task = progress.add_task(
+            "[green]Waiting for job to start...", start=True, total=None
+        )
         while True:
             time.sleep(CHECK_BATCH_EVERY)
             job_info = subprocess.run(
@@ -189,6 +191,44 @@ def create_batch_job(sbatch_args, name, job_time):
         rich.print("[red]Job ended[/red]")
     else:
         rich.print(f"[green]Job {job_id} will continue running[/green]")
+
+
+@cli.command(
+    help="Modify files or directories (and then undo) so that Sherlock won't delete them"
+)
+@click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--recursive",
+    "-r",
+    is_flag=True,
+    help="Recursively touch files in a directory, if passed.",
+)
+def touch(paths: list[Path], recursive: bool):
+    # Merely 'touch'ing is insufficient; Sherlock requires an actual modification to the file
+    file_paths = []
+    if any(p.is_dir() for p in paths):
+        if not recursive:
+            raise click.ClickException(
+                "You must pass --recursive/-r if you want to recursively touch a directory"
+            )
+        rich.print("[green]Finding all files within directories to touch...[/green]")
+    for path in paths:
+        if path.is_dir():
+            file_paths.extend(Path(path).rglob("*"))
+        else:
+            file_paths.append(Path(path))
+
+    with rich.progress.Progress() as progress:
+        task = progress.add_task("[green]Touching files...", total=len(file_paths))
+        for file_path in file_paths:
+            _touch_file(file_path)
+            progress.update(task, advance=1)
+
+
+def _touch_file(path: Path):
+    with open(path, "ab") as f:
+        f.write(b" ")
+    subprocess.run(["truncate", "-s", "-1", str(path)])
 
 
 if __name__ == "__main__":
