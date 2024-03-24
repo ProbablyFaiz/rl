@@ -214,7 +214,7 @@ def touch(paths: list[Path], recursive: bool):
         rich.print("[green]Finding all files within directories to touch...[/green]")
     for path in paths:
         if path.is_dir():
-            file_paths.extend(Path(path).rglob("*"))
+            file_paths.extend([p for p in Path(path).rglob("*") if p.is_file()])
         else:
             file_paths.append(Path(path))
 
