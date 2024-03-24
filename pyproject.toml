@@ -26,6 +26,7 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 reg = "reg.cli:cli"
+rl = "reg.cli:cli"
 
 [tool.setuptools]
 packages = ["reg"]
