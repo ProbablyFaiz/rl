@@ -15,7 +15,12 @@ classifiers = [
 requires-python = ">=3.6"
 dependencies = [
     "click",
-    "rich"
+    "rich",
+    "pexpect",
+    "pyopt",
+    "requests",
+    "pycryptodome",
+    "appdirs",
 ]
 
 [project.urls]

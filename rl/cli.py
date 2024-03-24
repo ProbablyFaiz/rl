@@ -1,9 +1,12 @@
 import datetime
+import json
+import random
 import subprocess
 import time
 from pathlib import Path
 
 import click
+import pexpect
 import rich
 import rich.progress
 
@@ -32,6 +35,17 @@ CHECK_BATCH_EVERY = 10
 DEFAULT_JOB_NAME = (
     f"interactive-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
 )
+
+BASE_CONFIG_DIR = Path("~/.config/rl").expanduser()
+
+CREDENTIALS_FILE = BASE_CONFIG_DIR / "sherlock.json"
+DUO_FILE = BASE_CONFIG_DIR / "duo.json"
+NODE_OPTIONS = [
+    "sh03-ln01",
+    "sh03-ln02",
+    "sh03-ln03",
+    "sh03-ln04",
+]
 
 
 @click.group()
@@ -232,5 +246,95 @@ def _touch_file(path: Path):
     subprocess.run(["truncate", "-s", "-1", str(path)])
 
 
+@cli.command(help="SSH into Sherlock")
+def ssh():
+    credentials = _read_credentials()
+    if not _read_duo():
+        print("Duo not configured. Run `rl duo` to configure it.")
+        return
+    if not credentials:
+        CREDENTIALS_FILE.parent.mkdir(exist_ok=True, parents=True)
+        print("Sherlock credentials not configured. Please enter them now.")
+        username = click.prompt("Stanford NetID")
+        password = click.prompt("NetID Password", hide_input=True)
+        node_choice = random.choice(NODE_OPTIONS)
+        credentials = {
+            "username": username,
+            "password": password,
+            "node": node_choice,
+        }
+
+        _write_credentials(credentials)
+        print(
+            f"Credentials saved to {CREDENTIALS_FILE}. Edit this file to change node."
+        )
+
+    node_url = f"{credentials['node']}.sherlock.stanford.edu"
+    print(f"Logging in to {node_url}")
+    ssh = pexpect.spawn(f"ssh {credentials['username']}@{node_url}")
+    ssh.expect("password:")
+    ssh.sendline(credentials["password"])
+    ssh.expect("Passcode or option")
+    ssh.sendline(get_duo_code())
+    ssh.interact()
+
+
+@cli.command(help="Configure Duo for Sherlock")
+def duo():
+    if _read_duo():
+        print(
+            "Warning: Duo already configured. Continuing will overwrite the current configuration."
+        )
+    _configure_duo()
+    print(f"Duo configuration saved to {DUO_FILE}")
+
+
+def get_duo_code() -> str:
+    import pyotp
+
+    duo_info = _read_duo()
+    if not duo_info:
+        raise Exception("Duo not configured. Run `rl duo` to configure it.")
+    hotp = pyotp.HOTP(duo_info["hotp_secret"])
+    code = hotp.at(duo_info["count"])
+    duo_info["count"] += 1
+    _write_duo(duo_info)
+    return code
+
+
+def _read_duo() -> dict | None:
+    if not DUO_FILE.exists():
+        return None
+    with open(DUO_FILE, "r") as f:
+        return json.load(f)
+
+
+def _write_duo(duo_info: dict):
+    with open(DUO_FILE, "w") as f:
+        json.dump(duo_info, f, indent=2)
+
+
+def _write_credentials(credentials):
+    with open(CREDENTIALS_FILE, "w") as f:
+        json.dump(credentials, f, indent=2)
+
+
+def _read_credentials() -> dict | None:
+    if not CREDENTIALS_FILE.exists():
+        return None
+    with open(CREDENTIALS_FILE, "r") as f:
+        return json.load(f)
+
+
+def _configure_duo():
+    from rl.duo import Duo
+
+    qr_url = click.prompt("Enter image address of the Duo activation QR code")
+    duo = Duo.from_qr_url(qr_url)
+    _write_duo(duo.to_config())
+
+
 if __name__ == "__main__":
+    BASE_CONFIG_DIR.mkdir(exist_ok=True, parents=True)
+    print(BASE_CONFIG_DIR)
     cli()

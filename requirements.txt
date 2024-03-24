@@ -1,2 +1,7 @@
 click
 rich
+pyotp
+pexpect
+requests
+pycryptodome
+appdirs
