@@ -39,7 +39,7 @@ def cli():
     pass
 
 
-@cli.command(help="Create an interactive job")
+@cli.command(help="Create an interactive job, even on the owners partition")
 @click.option(
     "--partition",
     "-p",
