@@ -7,8 +7,11 @@ from pathlib import Path
 
 import click
 import pexpect
+import regex
 import rich
 import rich.progress
+
+from rl.duo import Duo, DuoConfig
 
 CURRENT_USER = subprocess.run(
     ["whoami"], stdout=subprocess.PIPE, text=True
@@ -246,70 +249,92 @@ def _touch_file(path: Path):
     subprocess.run(["truncate", "-s", "-1", str(path)])
 
 
+# 3. Duo Push to XXX-XXX-0199
+_MFA_LINE_REGEX = regex.compile(
+    r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", regex.IGNORECASE
+)
+
+
 @cli.command(help="SSH into Sherlock")
 def ssh():
     credentials = _read_credentials()
-    if not _read_duo():
-        print("Duo not configured. Run `rl duo` to configure it.")
-        return
     if not credentials:
-        CREDENTIALS_FILE.parent.mkdir(exist_ok=True, parents=True)
-        print("Sherlock credentials not configured. Please enter them now.")
-        username = click.prompt("Stanford NetID")
-        password = click.prompt("NetID Password", hide_input=True)
-        node_choice = random.choice(NODE_OPTIONS)
-        credentials = {
-            "username": username,
-            "password": password,
-            "node": node_choice,
-        }
-
-        _write_credentials(credentials)
-        print(
-            f"Credentials saved to {CREDENTIALS_FILE}. Edit this file to change node."
+        raise Exception(
+            "Sherlock credentials not found. Run `rl configure sherlock` to set them."
         )
+    duo_config = _read_duo()
+    if not duo_config:
+        raise Exception("Duo not configured. Run `rl configure duo` to configure it.")
+    duo = Duo.from_config(duo_config)
 
     node_url = f"{credentials['node']}.sherlock.stanford.edu"
     print(f"Logging in to {node_url}")
     ssh = pexpect.spawn(f"ssh {credentials['username']}@{node_url}")
     ssh.expect("password:")
     ssh.sendline(credentials["password"])
+
     ssh.expect("Passcode or option")
-    ssh.sendline(get_duo_code())
+    duo_output = ssh.before.decode()
+    option_to_select = _MFA_LINE_REGEX.search(duo_output)
+    if not option_to_select:
+        raise Exception("Could not find Duo MFA option")
+    option_to_select = str(option_to_select.group("number"))
+    ssh.sendline(option_to_select + "\n")
+    duo.answer_latest_transaction(approve=True)
     ssh.interact()
 
 
-@cli.command(help="Configure Duo for Sherlock")
+@cli.group(help="Configure different aspects of rl")
+def configure():
+    pass
+
+
+@configure.command(help="Configure RL's access to Duo")
 def duo():
     if _read_duo():
+        print("Warning: Duo already configured. Continuing will overwrite.")
+    qr_url = click.prompt("Enter image address of the Duo activation QR code")
+    duo = Duo.from_qr_url(qr_url)
+    _write_duo(duo.to_config())
+
+
+@configure.command(help="Configure RL's access to Sherlock")
+def sherlock():
+    if _read_credentials():
         print(
-            "Warning: Duo already configured. Continuing will overwrite the current configuration."
+            "Warning: Sherlock credentials already configured. Continuing will overwrite."
         )
-    _configure_duo()
-    print(f"Duo configuration saved to {DUO_FILE}")
+    username = click.prompt("Stanford NetID")
+    password = click.prompt("NetID Password", hide_input=True)
+    node_choice = random.choice(NODE_OPTIONS)
+    print(
+        f"Selected node {node_choice} for you, you can change this in {CREDENTIALS_FILE}."
+    )
+    credentials = {
+        "username": username,
+        "password": password,
+        "node": node_choice,
+    }
+    _write_credentials(credentials)
+    print(f"Credentials saved to {CREDENTIALS_FILE}")
 
 
-def get_duo_code() -> str:
-    import pyotp
-
-    duo_info = _read_duo()
-    if not duo_info:
-        raise Exception("Duo not configured. Run `rl duo` to configure it.")
-    hotp = pyotp.HOTP(duo_info["hotp_secret"])
-    code = hotp.at(duo_info["count"])
-    duo_info["count"] += 1
-    _write_duo(duo_info)
-    return code
+def approve_duo_login():
+    duo_config = _read_duo()
+    if not duo_config:
+        raise Exception("Duo not configured. Run `rl configure duo` to configure it.")
+    duo = Duo.from_config(duo_config)
+    duo.answer_latest_transaction(approve=True)
 
 
-def _read_duo() -> dict | None:
+def _read_duo() -> DuoConfig | None:
     if not DUO_FILE.exists():
         return None
     with open(DUO_FILE, "r") as f:
         return json.load(f)
 
 
-def _write_duo(duo_info: dict):
+def _write_duo(duo_info: DuoConfig):
     with open(DUO_FILE, "w") as f:
         json.dump(duo_info, f, indent=2)
 
@@ -324,14 +349,6 @@ def _read_credentials() -> dict | None:
         return None
     with open(CREDENTIALS_FILE, "r") as f:
         return json.load(f)
-
-
-def _configure_duo():
-    from rl.duo import Duo
-
-    qr_url = click.prompt("Enter image address of the Duo activation QR code")
-    duo = Duo.from_qr_url(qr_url)
-    _write_duo(duo.to_config())
 
 
 if __name__ == "__main__":

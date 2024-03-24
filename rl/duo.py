@@ -86,7 +86,7 @@ class Duo:
         transactions = self.get_transactions()
         if not transactions:
             raise DuoError(f"No transactions found.")
-        return self.answer_transaction(transactions[0], approve)
+        return self.answer_transaction(transactions[0].id, approve)
 
     def get_transactions(self) -> list[Transaction]:
         payload = {
@@ -100,30 +100,31 @@ class Duo:
         response = requests.get(url, params=payload, headers=headers)
         if response.status_code != 200:
             raise DuoError(f"Failed to get transactions: {response.text}")
+        print(response.json())
         return [
             Transaction(id=c["urgid"])
             for c in response.json()["response"]["transactions"]
         ]
 
-    def answer_transaction(self, transaction: Transaction, approve: bool) -> dict:
+    def answer_transaction(self, transaction_id: str, approve: bool) -> dict:
         if approve:
             answer = APPROVAL_ANSWER
         else:
             raise NotImplementedError("Only approve is supported currently.")
         payload = {
-            "answer": answer,
             "akey": self.akey,
+            "answer": answer,
             "fips_status": "1",
             "hsm_status": "true",
             "pkpush": "rsa-sha512",
         }
-        path = DuoPath.REPLY_TRANSACTION.format(transaction_id=transaction.id)
+        path = DuoPath.REPLY_TRANSACTION.format(transaction_id=transaction_id)
         headers = self._get_headers(
             payload,
             path,
             "POST",
         )
-        headers["txId"] = transaction.id  # I have no idea why this is needed
+        headers["txId"] = transaction_id  # I have no idea why this is needed
         url = _get_url(self.host, path)
         response = requests.post(url, data=payload, headers=headers)
         response.raise_for_status()
