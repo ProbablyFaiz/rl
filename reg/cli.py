@@ -221,7 +221,10 @@ def touch(paths: list[Path], recursive: bool):
     with rich.progress.Progress() as progress:
         task = progress.add_task("[green]Touching files...", total=len(file_paths))
         for file_path in file_paths:
-            _touch_file(file_path)
+            try:
+                _touch_file(file_path)
+            except Exception as e:
+                rich.print(f"[red]Error touching {file_path}: {e}[/red]")
             progress.update(task, advance=1)
 
 
