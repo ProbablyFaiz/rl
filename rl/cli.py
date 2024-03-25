@@ -349,7 +349,7 @@ def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
     ssh.expect("password:")
     ssh.sendline(credentials["password"])
 
-    ssh.expect("Passcode or option \(\d+-\d+\): ")
+    ssh.expect(r"Passcode or option \(\d+-\d+\): ")
     duo_output = ssh.before.decode()
     option_to_select = _MFA_LINE_REGEX.search(duo_output)
     if not option_to_select:

@@ -9,6 +9,8 @@ jobs:
   build:
     permissions: write-all
     runs-on: ubuntu-latest
+    container:
+      image: centos:7
 
     steps:
       - name: Checkout code
