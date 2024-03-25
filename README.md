@@ -13,6 +13,9 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  job    Create an interactive job
-  touch  Temporarily modify files to avoid Sherlock auto-deletion
+  touch      Temporarily modify files to avoid Sherlock auto-deletion
+  job        Create an interactive job, even on the owners partition
+  scp        SCP files to/from Sherlock
+  ssh        SSH into Sherlock
+  configure  Configure different aspects of rl
 ```
