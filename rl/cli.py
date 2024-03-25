@@ -29,7 +29,9 @@ SSH_PATH = "/bin/ssh"
 
 # Check if fish is installed, otherwise use bash
 SHELL_PATH = (
-    subprocess.run(["which", "fish"], stdout=subprocess.PIPE, text=True).stdout.strip()
+    subprocess.run(
+        ["which", "fish"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+    ).stdout.strip()
     or subprocess.run(
         ["which", "bash"], stdout=subprocess.PIPE, text=True
     ).stdout.strip()
@@ -172,12 +174,6 @@ def job(
         partition,
         "--job-name",
         name,
-        "-C",
-        gpu_constraint,
-        "--gpu_cmode",
-        "shared",
-        "--gpus",
-        str(gpus),
         "--cpus-per-gpu" if gpus else "--cpus",
         str(cpus),
         "--mem",
@@ -185,6 +181,17 @@ def job(
         "--time",
         time,
     ]
+    if gpus:
+        common_args.extend(
+            [
+                "-C",
+                gpu_constraint,
+                "--gpu_cmode",
+                "shared",
+                "--gpus",
+                str(gpus),
+            ]
+        )
 
     if partition == "owners":
         create_batch_job(common_args, name, time)
@@ -309,7 +316,7 @@ def ssh(node: str):
 
     node = node or credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
-    rich.print(f"[green]Logging in to {node_url}[/green]")
+    rich.print(f"[green]Logging you in to {node_url}[/green]")
     ssh_command = f"ssh {credentials['username']}@{node_url}"
     _run_sherlock_ssh(ssh_command, credentials, duo)
 
