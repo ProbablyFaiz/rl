@@ -119,7 +119,7 @@ def _must_run_on_sherlock(func: Callable):
     "--gpus",
     "-g",
     help="Number of GPUs",
-    default=1,
+    default=0,
     show_default=True,
     type=int,
 )
@@ -134,7 +134,7 @@ def _must_run_on_sherlock(func: Callable):
 @click.option(
     "--cpus",
     "-c",
-    help="Number of CPUs per GPU",
+    help="Number of CPUs per GPU or total CPUs if no GPUs specified",
     default=4,
     show_default=True,
     type=int,
