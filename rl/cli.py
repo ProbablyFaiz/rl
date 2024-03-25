@@ -1,4 +1,5 @@
 import datetime
+import functools
 import json
 import os
 import random
@@ -6,6 +7,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import Callable
 
 import click
 import pexpect
@@ -60,6 +62,40 @@ class RLError(Exception):
 @click.group()
 def cli():
     pass
+
+
+def _requires_duo(func: Callable):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        duo_config = _read_duo()
+        if not duo_config:
+            raise RLError("Duo not configured. Run `rl configure duo` to configure it.")
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def _requires_sherlock_credentials(func: Callable):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        credentials = _read_credentials()
+        if not credentials:
+            raise RLError(
+                "Sherlock credentials not found. Run `rl configure sherlock` to set them."
+            )
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def _must_run_on_sherlock(func: Callable):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not os.path.exists("/usr/bin/sbatch"):
+            raise RLError("This command must be run on Sherlock.")
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 @cli.command(help="Create an interactive job, even on the owners partition")
@@ -119,6 +155,7 @@ def cli():
     show_default=True,
     type=str,
 )
+@_must_run_on_sherlock
 def job(
     partition: str,
     name: str,
@@ -224,6 +261,7 @@ def create_batch_job(sbatch_args, name, job_time):
     is_flag=True,
     help="Recursively touch files in a directory, if passed.",
 )
+@_must_run_on_sherlock
 def touch(paths: list[Path], recursive: bool):
     # Merely 'touch'ing is insufficient; Sherlock requires an actual modification to the file
     file_paths = []
@@ -256,24 +294,51 @@ def _touch_file(path: Path):
 
 
 @cli.command(help="SSH into Sherlock")
-def ssh():
+@click.option(
+    "--node",
+    "-n",
+    help="Override the node to ssh into. E.g., `sh03-ln01`.",
+    required=False,
+    type=str,
+)
+@_requires_duo
+@_requires_sherlock_credentials
+def ssh(node: str):
     credentials = _read_credentials()
-    if not credentials:
-        raise RLError(
-            "Sherlock credentials not found. Run `rl configure sherlock` to set them."
-        )
-    duo_config = _read_duo()
-    if not duo_config:
-        raise RLError("Duo not configured. Run `rl configure duo` to configure it.")
-    duo = Duo.from_config(duo_config)
+    duo = Duo.from_config(_read_duo())
 
-    node_url = f"{credentials['node']}.sherlock.stanford.edu"
+    node = node or credentials["node"]
+    node_url = f"{node}.sherlock.stanford.edu"
     rich.print(f"[green]Logging in to {node_url}[/green]")
     ssh_command = f"ssh {credentials['username']}@{node_url}"
     _run_sherlock_ssh(ssh_command, credentials, duo)
 
 
-# 3. Duo Push to XXX-XXX-0199
+@cli.command(
+    help="SCP files to/from Sherlock",
+    context_settings=dict(ignore_unknown_options=True),
+)
+@click.argument("direction", type=click.Choice(["to", "from"]))
+@click.argument("source", type=str)
+@click.argument("destination", type=str)
+@click.argument("scp_options", nargs=-1, type=str)
+@_requires_duo
+@_requires_sherlock_credentials
+def scp(direction: str, source: str, destination: str, scp_options: list[str]):
+    credentials = _read_credentials()
+    duo = Duo.from_config(_read_duo())
+
+    node = credentials["node"]
+    node_url = f"{node}.sherlock.stanford.edu"
+    rich.print(f"[green]Logging in to {node_url}[/green]")
+    scp_command = (
+        f"scp {' '.join(scp_options)} {source} {credentials['username']}@{node_url}:{destination}"
+        if direction == "to"
+        else f"scp {' '.join(scp_options)} {credentials['username']}@{node_url}:{source} {destination}"
+    )
+    _run_sherlock_ssh(scp_command, credentials, duo)
+
+
 _MFA_LINE_REGEX = regex.compile(
     r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", regex.IGNORECASE
 )
@@ -298,17 +363,18 @@ def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
         term_size = os.get_terminal_size()
         ssh.setwinsize(term_size.lines, term_size.columns)
 
+    # It seems like the Duo MFA doesn't actually go through until we .interact()
+    #  So we spin up a thread to approve it in the background when it's ready
     threading.Thread(target=_approve_when_ready, args=(duo,)).start()
     ssh.interact()
 
 
 def _approve_when_ready(duo):
     for _ in range(10):
-        try:
-            duo.answer_latest_transaction(True)
+        if transactions := duo.get_transactions():
+            for tr in transactions:
+                duo.answer_transaction(tr.id, approve=True)
             return
-        except Exception:
-            time.sleep(0.5)
     raise RLError("Failed to approve Duo MFA after 10 attempts.")
 
 
