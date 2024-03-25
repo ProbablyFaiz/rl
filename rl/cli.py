@@ -291,6 +291,8 @@ def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
         raise RLError("Could not find Duo MFA option")
     option_to_select = option_to_select.group("number")
     ssh.sendline(option_to_select)
+    # Clear the buffer before we hand over control to the user
+    ssh.expect("\n")
 
     if ssh_command.startswith("ssh"):
         term_size = os.get_terminal_size()
