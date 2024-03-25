@@ -23,6 +23,7 @@ CURRENT_USER = subprocess.run(
 CURRENT_GROUP = subprocess.run(
     ["id", "-gn"], stdout=subprocess.PIPE, text=True
 ).stdout.strip()
+ON_SHERLOCK = os.path.exists("/usr/bin/sbatch")
 
 # Must use full path to avoid issues with conda environments
 SSH_PATH = "/bin/ssh"
@@ -93,7 +94,7 @@ def _requires_sherlock_credentials(func: Callable):
 def _must_run_on_sherlock(func: Callable):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        if not os.path.exists("/usr/bin/sbatch"):
+        if not ON_SHERLOCK:
             raise RLError("This command must be run on Sherlock.")
         return func(*args, **kwargs)
 
@@ -180,6 +181,7 @@ def job(
         mem,
         "--time",
         time,
+        "--use-min-nodes",
     ]
     if gpus:
         common_args.extend(
@@ -245,9 +247,16 @@ def create_batch_job(sbatch_args, name, job_time):
                 progress.update(task, completed=1)
                 break
 
-    rich.print(
-        f"[green]Job {job_id} started on node {job_node}. SSHing into node...[/green]"
-    )
+    if "[" in job_node:
+        rich.print(
+            f"[green]Job {job_id} started on nodes {job_node}. Pick one to ssh into.[/green]"
+        )
+        # Get the user's choice of node
+        job_node = click.prompt("Node", type=str)
+    else:
+        rich.print(
+            f"[green]Job {job_id} started on node {job_node}. SSHing into node...[/green]"
+        )
     ssh_args = [
         SSH_PATH,
         job_node,
