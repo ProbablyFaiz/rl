@@ -4,4 +4,4 @@ pyotp
 pexpect
 requests
 pycryptodome
-appdirs
+regex

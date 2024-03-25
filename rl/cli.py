@@ -449,5 +449,4 @@ def _read_credentials() -> dict | None:
 
 if __name__ == "__main__":
     BASE_CONFIG_DIR.mkdir(exist_ok=True, parents=True)
-    print(BASE_CONFIG_DIR)
     cli()
