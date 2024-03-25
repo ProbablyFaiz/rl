@@ -100,7 +100,6 @@ class Duo:
         response = requests.get(url, params=payload, headers=headers)
         if response.status_code != 200:
             raise DuoError(f"Failed to get transactions: {response.text}")
-        print(response.json())
         return [
             Transaction(id=c["urgid"])
             for c in response.json()["response"]["transactions"]

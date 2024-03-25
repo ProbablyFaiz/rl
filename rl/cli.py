@@ -1,7 +1,9 @@
 import datetime
 import json
+import os
 import random
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -49,6 +51,10 @@ NODE_OPTIONS = [
     "sh03-ln03",
     "sh03-ln04",
 ]
+
+
+class RLError(Exception):
+    pass
 
 
 @click.group()
@@ -187,7 +193,7 @@ def create_batch_job(sbatch_args, name, job_time):
                 check=True,
             ).stdout.split()
             if len(job_info) == 0:
-                raise Exception(
+                raise RLError(
                     "Job not found when checking status with squeue, what happened?"
                 )
             if job_info[4] == "R":
@@ -249,39 +255,59 @@ def _touch_file(path: Path):
     subprocess.run(["truncate", "-s", "-1", str(path)])
 
 
+@cli.command(help="SSH into Sherlock")
+def ssh():
+    credentials = _read_credentials()
+    if not credentials:
+        raise RLError(
+            "Sherlock credentials not found. Run `rl configure sherlock` to set them."
+        )
+    duo_config = _read_duo()
+    if not duo_config:
+        raise RLError("Duo not configured. Run `rl configure duo` to configure it.")
+    duo = Duo.from_config(duo_config)
+
+    node_url = f"{credentials['node']}.sherlock.stanford.edu"
+    rich.print(f"[green]Logging in to {node_url}[/green]")
+    ssh_command = f"ssh {credentials['username']}@{node_url}"
+    _run_sherlock_ssh(ssh_command, credentials, duo)
+
+
 # 3. Duo Push to XXX-XXX-0199
 _MFA_LINE_REGEX = regex.compile(
     r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", regex.IGNORECASE
 )
 
 
-@cli.command(help="SSH into Sherlock")
-def ssh():
-    credentials = _read_credentials()
-    if not credentials:
-        raise Exception(
-            "Sherlock credentials not found. Run `rl configure sherlock` to set them."
-        )
-    duo_config = _read_duo()
-    if not duo_config:
-        raise Exception("Duo not configured. Run `rl configure duo` to configure it.")
-    duo = Duo.from_config(duo_config)
-
-    node_url = f"{credentials['node']}.sherlock.stanford.edu"
-    print(f"Logging in to {node_url}")
-    ssh = pexpect.spawn(f"ssh {credentials['username']}@{node_url}")
+def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
+    ssh = pexpect.spawn(ssh_command)
     ssh.expect("password:")
     ssh.sendline(credentials["password"])
 
-    ssh.expect("Passcode or option")
+    ssh.expect("Passcode or option \(\d+-\d+\): ")
     duo_output = ssh.before.decode()
     option_to_select = _MFA_LINE_REGEX.search(duo_output)
     if not option_to_select:
-        raise Exception("Could not find Duo MFA option")
-    option_to_select = str(option_to_select.group("number"))
-    ssh.sendline(option_to_select + "\n")
-    duo.answer_latest_transaction(approve=True)
+        raise RLError("Could not find Duo MFA option")
+    option_to_select = option_to_select.group("number")
+    ssh.sendline(option_to_select)
+
+    if ssh_command.startswith("ssh"):
+        term_size = os.get_terminal_size()
+        ssh.setwinsize(term_size.lines, term_size.columns)
+
+    threading.Thread(target=_approve_when_ready, args=(duo,)).start()
     ssh.interact()
+
+
+def _approve_when_ready(duo):
+    for _ in range(10):
+        try:
+            duo.answer_latest_transaction(True)
+            return
+        except Exception:
+            time.sleep(0.5)
+    raise RLError("Failed to approve Duo MFA after 10 attempts.")
 
 
 @cli.group(help="Configure different aspects of rl")
@@ -292,7 +318,9 @@ def configure():
 @configure.command(help="Configure RL's access to Duo")
 def duo():
     if _read_duo():
-        print("Warning: Duo already configured. Continuing will overwrite.")
+        rich.print(
+            "[yellow]Warning: Duo already configured. Continuing will overwrite.[/yellow]"
+        )
     qr_url = click.prompt("Enter image address of the Duo activation QR code")
     duo = Duo.from_qr_url(qr_url)
     _write_duo(duo.to_config())
@@ -301,8 +329,8 @@ def duo():
 @configure.command(help="Configure RL's access to Sherlock")
 def sherlock():
     if _read_credentials():
-        print(
-            "Warning: Sherlock credentials already configured. Continuing will overwrite."
+        rich.print(
+            "[yellow]Warning: Sherlock credentials already configured. Continuing will overwrite.[/yellow]"
         )
     username = click.prompt("Stanford NetID")
     password = click.prompt("NetID Password", hide_input=True)
@@ -322,7 +350,7 @@ def sherlock():
 def approve_duo_login():
     duo_config = _read_duo()
     if not duo_config:
-        raise Exception("Duo not configured. Run `rl configure duo` to configure it.")
+        raise RLError("Duo not configured. Run `rl configure duo` to configure it.")
     duo = Duo.from_config(duo_config)
     duo.answer_latest_transaction(approve=True)
 
