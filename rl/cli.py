@@ -101,7 +101,10 @@ def _must_run_on_sherlock(func: Callable):
     return wrapper
 
 
-@cli.command(help="Create an interactive job, even on the owners partition")
+@cli.command(
+    help="Create an interactive job, even on the owners partition",
+    context_settings=dict(ignore_unknown_options=True),
+)
 @click.option(
     "--partition",
     "-p",
@@ -158,6 +161,12 @@ def _must_run_on_sherlock(func: Callable):
     show_default=True,
     type=str,
 )
+@click.argument(
+    "slurm_args",
+    nargs=-1,
+    type=str,
+    required=False,
+)
 @_must_run_on_sherlock
 def job(
     partition: str,
@@ -167,6 +176,7 @@ def job(
     cpus: int,
     mem: str,
     time: str,
+    slurm_args: list[str],
 ):
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
@@ -182,6 +192,7 @@ def job(
         "--time",
         time,
         "--use-min-nodes",
+        *slurm_args,
     ]
     if gpus:
         common_args.extend(
