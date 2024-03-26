@@ -230,6 +230,10 @@ def create_batch_job(sbatch_args, name, job_time):
 
     sbatch_args = [
         "sbatch",
+        "--output",
+        f"{LOG_DIR}/{name}-%j.out",
+        "--error",
+        f"{LOG_DIR}/{name}-%j.err",
         *sbatch_args,
         "--wrap",
         f"python -c 'import time; time.sleep({sleep_time})'",
