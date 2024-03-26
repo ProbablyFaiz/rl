@@ -23,10 +23,12 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 @click.command()
 @click.option("--tag", help="Tag to create for the release", required=True)
 def publish(tag: str):
+    os.chdir(PROJECT_ROOT_DIR)
+
     subprocess.run(["git", "tag", tag])
     subprocess.run(["git", "push", "origin", tag])
 
-    subprocess.run(["pyinstaller", "--onefile", str(ENTRY_POINT)])
+    subprocess.run(["pyinstaller", "--onefile", str(ENTRY_POINT), "-n", DIST_FILE.name])
 
     gh = github.Github(GITHUB_TOKEN)
     repo = gh.get_repo(GITHUB_REPO)
