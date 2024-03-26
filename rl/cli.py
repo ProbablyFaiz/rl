@@ -257,7 +257,6 @@ def create_batch_job(sbatch_args, name, job_time):
                 job_node, job_id = job_info[7], job_info[0]
                 progress.update(task, completed=1)
                 break
-
     if "[" in job_node:
         rich.print(
             f"[green]Job {job_id} started on nodes {job_node}. Pick one to ssh into.[/green]"
@@ -386,14 +385,25 @@ def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
     # Clear the buffer before we hand over control to the user
     ssh.expect("\n")
 
-    if ssh_command.startswith("ssh"):
-        term_size = os.get_terminal_size()
-        ssh.setwinsize(term_size.lines, term_size.columns)
-
     # It seems like the Duo MFA doesn't actually go through until we .interact()
     #  So we spin up a thread to approve it in the background when it's ready
-    threading.Thread(target=_approve_when_ready, args=(duo,)).start()
+    background_tasks = [
+        threading.Thread(target=_approve_when_ready, args=(duo,)),
+        threading.Thread(target=_resize_ssh, args=(ssh,)),
+    ]
+    for task in background_tasks:
+        task.start()
     ssh.interact()
+
+
+def _resize_ssh(ssh):
+    previous_size = None
+    while ssh.isalive():
+        current_size = os.get_terminal_size()
+        if current_size != previous_size:
+            ssh.setwinsize(current_size.lines, current_size.columns)
+            previous_size = current_size
+        time.sleep(0.2)
 
 
 def _approve_when_ready(duo):
