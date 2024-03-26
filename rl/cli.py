@@ -396,7 +396,7 @@ def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
     ssh.interact()
 
 
-def _resize_ssh(ssh):
+def _resize_ssh(ssh: pexpect.spawn):
     previous_size = None
     while ssh.isalive():
         current_size = os.get_terminal_size()
@@ -406,7 +406,7 @@ def _resize_ssh(ssh):
         time.sleep(0.2)
 
 
-def _approve_when_ready(duo):
+def _approve_when_ready(duo: Duo):
     for _ in range(10):
         if transactions := duo.get_transactions():
             for tr in transactions:
