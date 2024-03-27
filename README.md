@@ -9,7 +9,7 @@ pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git"
 
 On Sherlock, you should probably use the pre-compiled binary instead:
 ```bash
-wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.1/rl-sherlock" -O ~/.local/bin/rl
+wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.1/rl-centos7-x86" -O ~/.local/bin/rl
 ```
 
 
