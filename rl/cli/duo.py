@@ -6,7 +6,6 @@ import base64
 import dataclasses
 import datetime
 import email.utils
-import enum
 import urllib.parse
 from typing import TypedDict
 

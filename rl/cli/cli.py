@@ -15,7 +15,7 @@ import regex
 import rich
 import rich.progress
 
-from rl.duo import Duo, DuoConfig
+from rl.cli.duo import Duo, DuoConfig
 
 CURRENT_USER = subprocess.run(
     ["whoami"], stdout=subprocess.PIPE, text=True
