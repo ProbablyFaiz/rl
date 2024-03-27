@@ -340,7 +340,9 @@ def ssh(node: str):
     node = node or credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
     rich.print(f"[green]Logging you in to {node_url}[/green]")
-    ssh_command = f"ssh {credentials['username']}@{node_url}"
+    ssh_command = (
+        f"ssh -o StrictHostKeyChecking=no {credentials['username']}@{node_url}"
+    )
     _run_sherlock_ssh(ssh_command, credentials, duo)
 
 
@@ -361,10 +363,11 @@ def scp(direction: str, source: str, destination: str, scp_options: list[str]):
     node = credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
     rich.print(f"[green]Logging in to {node_url}[/green]")
+    scp_prefix = "scp -o StrictHostKeyChecking=no"
     scp_command = (
-        f"scp {' '.join(scp_options)} {source} {credentials['username']}@{node_url}:{destination}"
+        f"{scp_prefix} {' '.join(scp_options)} {source} {credentials['username']}@{node_url}:{destination}"
         if direction == "to"
-        else f"scp {' '.join(scp_options)} {credentials['username']}@{node_url}:{source} {destination}"
+        else f"{scp_prefix} {' '.join(scp_options)} {credentials['username']}@{node_url}:{source} {destination}"
     )
     _run_sherlock_ssh(scp_command, credentials, duo)
 
