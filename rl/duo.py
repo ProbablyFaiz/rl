@@ -16,7 +16,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 
 
-class DuoPath(str, enum.Enum):
+# Normally, I would make this a (str, Enum) subclass, but it turns out Python 3.11
+#  makes a breaking change to (str, Enum) mixins! https://github.com/python/cpython/issues/100458
+class DuoPath:
     ACTIVATION = "/push/v2/activation/{code}"
     TRANSACTIONS = "/push/v2/device/transactions"
     REPLY_TRANSACTION = "/push/v2/device/transactions/{transaction_id}"
