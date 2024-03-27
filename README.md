@@ -4,12 +4,12 @@
 
 On your local machine:
 ```bash
-pip install "rl @ git+https://github.com/reglab/rl.git"
+pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git"
 ```
 
 On Sherlock, you should probably use the pre-compiled binary instead:
 ```bash
-wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.1/rl" -O ~/.local/bin/rl
+wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.1/rl-sherlock" -O ~/.local/bin/rl
 ```
 
 
