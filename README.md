@@ -24,8 +24,7 @@ wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.2/rl-centos7-x86
 
 > *TODO: Add visual instructions for setting up Duo.*
 
-- Go to Duo Central. Add a device with the phone number `805-555-0199` (this is a [reserved fake number](https://arc.
-  net/l/quote/fbclpupw)). When it shows the QR code, right click and copy its image address.
+- Go to Duo Central. Add a device with the phone number `805-555-0199` (this is a [reserved fake number](https://arc.net/l/quote/fbclpupw)). When it shows the QR code, right click and copy its image address.
 - Run `rl configure duo`. Paste the image address when prompted.
 
 
