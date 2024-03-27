@@ -4,12 +4,12 @@
 
 On your local machine:
 ```bash
-pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git"
+pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git@v0.3.2"
 ```
 
 On Sherlock, you should probably use the pre-compiled binary instead:
 ```bash
-wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.1/rl-centos7-x86" -O ~/.local/bin/rl
+wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.3.2/rl-centos7-x86" -O ~/.local/bin/rl
 ```
 
 
