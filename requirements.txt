@@ -5,3 +5,4 @@ pexpect
 requests
 pycryptodome
 regex
+python-dotenv

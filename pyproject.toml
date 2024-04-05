@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-requires-python = ">=3.6"
+requires-python = ">=3.9"
 dependencies = [
     "click",
     "rich",
@@ -22,6 +22,14 @@ dependencies = [
     "pycryptodome",
     "appdirs",
     "regex",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pygithub",
+    "pyinstaller",
+    "black",
+    "isort",
 ]
 
 [project.urls]

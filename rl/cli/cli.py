@@ -161,6 +161,12 @@ def _must_run_on_sherlock(func: Callable):
     show_default=True,
     type=str,
 )
+@click.option(
+    "--batch",
+    "-b",
+    is_flag=True,
+    help="Run as a batch job, then ssh into it. This is automatically set if partition is 'owners'.",
+)
 @click.argument(
     "slurm_args",
     nargs=-1,
@@ -176,6 +182,7 @@ def job(
     cpus: int,
     mem: str,
     time: str,
+    batch: bool,
     slurm_args: list[str],
 ):
     LOG_DIR.mkdir(exist_ok=True, parents=True)
@@ -206,7 +213,7 @@ def job(
             ]
         )
 
-    if partition == "owners":
+    if batch or partition == "owners":
         create_batch_job(common_args, name, time)
         return
 
@@ -261,7 +268,7 @@ def create_batch_job(sbatch_args, name, job_time):
                 job_node, job_id = job_info[7], job_info[0]
                 progress.update(task, completed=1)
                 break
-    if "[" in job_node:
+    if "[" in job_node or "," in job_node:
         rich.print(
             f"[green]Job {job_id} started on nodes {job_node}. Pick one to ssh into.[/green]"
         )

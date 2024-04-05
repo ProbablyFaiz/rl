@@ -1,3 +1,2 @@
 pyinstaller
 pygithub
-python-dotenv
