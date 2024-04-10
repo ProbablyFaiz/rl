@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-PROJECT_ROOT_DIR = Path(__file__).parent.parent
+PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent
 
-ENTRY_POINT = PROJECT_ROOT_DIR / "rl" / "cli.py"
+ENTRY_POINT = PROJECT_ROOT_DIR / "rl" / "cli" / "cli.py"
 DIST_DIR = PROJECT_ROOT_DIR / "dist"
 DIST_FILE = DIST_DIR / "rl"
 
