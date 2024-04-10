@@ -1,6 +1,6 @@
 [project]
 name = "rl"
-version = "0.3.4"
+version = "0.3.5"
 authors = [
     { name = "Faiz Surani", email = "faiz@law.stanford.edu" },
 ]
@@ -40,7 +40,7 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-rl = "rl.cli.cli:cli"
+rl = "rl.cli.main:cli"
 
 [tool.setuptools]
 packages = ["rl"]
