@@ -12,7 +12,7 @@ load_dotenv()
 
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent
 
-ENTRY_POINT = PROJECT_ROOT_DIR / "rl" / "cli" / "cli.py"
+ENTRY_POINT = PROJECT_ROOT_DIR / "rl" / "main" / "cli.py"
 DIST_DIR = PROJECT_ROOT_DIR / "dist"
 DIST_FILE = DIST_DIR / "rl"
 
