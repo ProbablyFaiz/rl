@@ -6,16 +6,20 @@ import random
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 import click
 import pexpect
+import questionary
 import regex
 import rich
 import rich.progress
+from strenum import StrEnum
 
 from rl.cli.duo import Duo, DuoConfig
+from rl.cli.nodelist_parser import parse_nodes_str
 
 CURRENT_USER = subprocess.run(
     ["whoami"], stdout=subprocess.PIPE, text=True
@@ -42,9 +46,7 @@ LOG_DIR = Path("/scratch/users") / CURRENT_USER / "logs"
 
 CHECK_BATCH_EVERY = 10
 
-DEFAULT_JOB_NAME = (
-    f"interactive-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
-)
+DEFAULT_JOB_NAME = f"rl-{datetime.datetime.now().strftime('%m-%d-%H-%M-%S')}"
 
 BASE_CONFIG_DIR = Path("~/.config/rl").expanduser()
 
@@ -60,6 +62,24 @@ NODE_OPTIONS = [
 
 class RLError(Exception):
     pass
+
+
+@dataclass
+class JobInfo:
+    """Information about a job returned by squeue."""
+
+    job_id: str
+    job_name: str
+    user: str
+    partition: str
+    num_nodes: int
+    nodes: str
+    state: "JobState"
+
+
+class JobState(StrEnum):
+    RUNNING = "R"
+    PENDING = "PD"
 
 
 @click.group()
@@ -167,6 +187,12 @@ def _must_run_on_sherlock(func: Callable):
     is_flag=True,
     help="Run as a batch job, then ssh into it. This is automatically set if partition is 'owners'.",
 )
+@click.option(
+    "--command",
+    "-cmd",
+    help="Command to run as a batch job",
+    type=str,
+)
 @click.argument(
     "slurm_args",
     nargs=-1,
@@ -183,8 +209,15 @@ def job(
     mem: str,
     time: str,
     batch: bool,
+    command: str | None,
     slurm_args: list[str],
 ):
+    if partition == "owners":
+        batch = True
+
+    if command is not None:
+        assert batch is True, "Command can only be passed if running as a batch job"
+
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
     common_args = [
@@ -213,20 +246,19 @@ def job(
             ]
         )
 
-    if batch or partition == "owners":
+    if batch:
         create_batch_job(common_args, name, time)
-        return
-
-    rich.print("[green]Starting interactive job...[/green]")
-    # Show the output to the user
-    subprocess.run(
-        [
-            "srun",
-            *common_args,
-            "--pty",
-            SHELL_PATH,
-        ]
-    )
+    else:
+        rich.print("[green]Starting interactive job...[/green]")
+        # Show the output to the user
+        subprocess.run(
+            [
+                "srun",
+                *common_args,
+                "--pty",
+                SHELL_PATH,
+            ]
+        )
 
 
 def create_batch_job(sbatch_args, name, job_time):
@@ -243,29 +275,25 @@ def create_batch_job(sbatch_args, name, job_time):
         f"{LOG_DIR}/{name}-%j.err",
         *sbatch_args,
         "--wrap",
-        f"python -c 'import time; time.sleep({sleep_time})'",
+        f"tmux new-session -d -s rl && python -c 'import time; time.sleep({sleep_time})'",
     ]
     subprocess.run(sbatch_args, check=True)
 
     job_node, job_id = None, None
     with rich.progress.Progress(transient=True) as progress:
+        # noinspection PyTypeChecker
         task = progress.add_task(
             "[green]Waiting for job to start...", start=True, total=None
         )
         while True:
             time.sleep(CHECK_BATCH_EVERY)
-            job_info = subprocess.run(
-                ["squeue", "-u", CURRENT_USER, "-n", name, "-h"],
-                stdout=subprocess.PIPE,
-                text=True,
-                check=True,
-            ).stdout.split()
-            if len(job_info) == 0:
+            curr_job = next((j for j in _get_all_jobs() if j.job_name == name), None)
+            if curr_job is None:
                 raise RLError(
-                    "Job not found when checking status with squeue, what happened?"
+                    "Job not found when checking status with squeue; what happened?"
                 )
-            if job_info[4] == "R":
-                job_node, job_id = job_info[7], job_info[0]
+            if curr_job.state == JobState.RUNNING:
+                job_node, job_id = curr_job.nodes, curr_job.job_id
                 progress.update(task, completed=1)
                 break
     if "[" in job_node or "," in job_node:
@@ -288,6 +316,41 @@ def create_batch_job(sbatch_args, name, job_time):
         rich.print("[red]Job ended[/red]")
     else:
         rich.print(f"[green]Job {job_id} will continue running[/green]")
+
+
+@_must_run_on_sherlock
+def _get_all_jobs(show_progress=False):
+    if show_progress:
+        with rich.progress.Progress() as progress:
+            # noinspection PyTypeChecker
+            task = progress.add_task("Checking jobs in queue...", total=None)
+            results = _get_all_jobs(show_progress=False)
+            progress.update(task, completed=1)
+            return results
+
+    output = subprocess.run(
+        ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t"],
+        stdout=subprocess.PIPE,
+        text=True,
+        check=True,
+    ).stdout
+    results = []
+    for line in output.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        job_id, job_name, user, partition, nodes, state = line.split()
+        results.append(
+            JobInfo(
+                job_id=job_id,
+                job_name=job_name,
+                user=user,
+                partition=partition,
+                nodes=parse_nodes_str(nodes),
+                state=state,
+            )
+        )
+    return results
 
 
 @cli.command(short_help="Temporarily modify files to avoid Sherlock auto-deletion")
@@ -330,27 +393,67 @@ def _touch_file(path: Path):
     subprocess.run(["truncate", "-s", "-1", str(path)])
 
 
-@cli.command(help="SSH into Sherlock")
-@click.option(
-    "--node",
-    "-n",
-    help="Override the node to ssh into. E.g., `sh03-ln01`.",
-    required=False,
-    type=str,
-)
+@cli.command(help="Approve a Duo login request")
+def approve():
+    approve_duo_login()
+    rich.print("[green]Duo login approved[/green]")
+
+
+@cli.command(help="SSH into Sherlock or into a particular job while on Sherlock")
+@click.argument("node", required=False, type=str)
+def ssh(node: str):
+    if not ON_SHERLOCK:
+        _ssh_into_sherlock(node)
+    else:
+        _ssh_within_sherlock(node)
+
+
 @_requires_duo
 @_requires_sherlock_credentials
-def ssh(node: str):
+def _ssh_into_sherlock(node: str):
     credentials = _read_credentials()
     duo = Duo.from_config(_read_duo())
 
     node = node or credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
     rich.print(f"[green]Logging you in to {node_url}[/green]")
-    ssh_command = (
-        f"ssh -o StrictHostKeyChecking=no {credentials['username']}@{node_url}"
-    )
+    ssh_command = f"ssh -o StrictHostKeyChecking=no {credentials['username']}@{node_url} -t 'fish || bash'"
     _run_sherlock_ssh(ssh_command, credentials, duo)
+
+
+@_must_run_on_sherlock
+def _ssh_within_sherlock(node: str):
+    if not node:
+        node = _select_node()
+    rich.print(f"[green]SSHing into {node}[/green]")
+    # When sshing in, we want to try to tmux attach and if that fails, just open a shell
+    run_command = "tmux attach || fish || bash"
+    ssh = pexpect.spawn(f"ssh {node} -t '{run_command}'")
+    ssh.interact()
+
+
+def _select_node() -> str:
+    running_jobs = [
+        job
+        for job in _get_all_jobs(show_progress=True)
+        if job.state == JobState.RUNNING
+    ]
+    if not running_jobs:
+        rich.print(
+            "[yellow]No running jobs found. Please enter a node to ssh into.[/yellow]"
+        )
+        return click.prompt("Node", type=str)
+    name_to_node_map = {}
+    node_names = []
+    for job in running_jobs:
+        for node in job.nodes:
+            node_name = f"{node} (job {job.job_id})"
+            name_to_node_map[node_name] = node
+            node_names.append(node_name)
+    selection = questionary.select(
+        "Select a node to ssh into", choices=node_names
+    ).ask()
+    return name_to_node_map[selection]
 
 
 @cli.command(

@@ -6,3 +6,5 @@ requests
 pycryptodome
 regex
 python-dotenv
+questionary
+strenum

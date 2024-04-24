@@ -22,6 +22,8 @@ dependencies = [
     "pycryptodome",
     "appdirs",
     "regex",
+    "questionary",
+    "StrEnum",
 ]
 
 [project.optional-dependencies]
