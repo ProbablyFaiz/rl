@@ -75,6 +75,7 @@ class JobInfo:
     partition: str
     nodes: list[str]
     state: "JobState"
+    time_remaining: str
 
 
 class JobState(StrEnum):
@@ -281,6 +282,7 @@ def _list_jobs():
     table.add_column("Partition")
     table.add_column("Nodes")
     table.add_column("State")
+    table.add_column("Time Remaining")
     for job in jobs:
         table.add_row(
             job.job_id,
@@ -289,6 +291,7 @@ def _list_jobs():
             job.partition,
             ", ".join(job.nodes),
             STATE_DISPLAY_MAP[job.state],
+            job.time_remaining,
         )
     rich.print(table)
 
@@ -356,7 +359,7 @@ def _get_all_jobs(show_progress=False):
             return results
 
     output = subprocess.run(
-        ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t"],
+        ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t %L"],
         stdout=subprocess.PIPE,
         text=True,
         check=True,
@@ -369,7 +372,9 @@ def _get_all_jobs(show_progress=False):
         # Splitting on exactly one whitespace is important here,
         #  split() by default treats multiple whitespaces as one,
         #  which goes wrong when the nodes field is empty.
-        job_id, job_name, user, partition, nodes, state = line.split(" ")
+        job_id, job_name, user, partition, nodes, state, time_remaining = line.split(
+            " "
+        )
         results.append(
             JobInfo(
                 job_id=job_id,
@@ -378,6 +383,7 @@ def _get_all_jobs(show_progress=False):
                 partition=partition,
                 nodes=parse_nodes_str(nodes),
                 state=state,
+                time_remaining=time_remaining,
             )
         )
     return results
