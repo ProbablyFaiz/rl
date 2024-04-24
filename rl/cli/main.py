@@ -82,9 +82,9 @@ class JobState(StrEnum):
     PENDING = "PD"
 
 
-STATE_NAME_MAP = {
-    JobState.RUNNING: "Running",
-    JobState.PENDING: "Pending",
+STATE_DISPLAY_MAP = {
+    JobState.RUNNING: "[green]Running[/green]",
+    JobState.PENDING: "[yellow]Pending[/yellow]",
 }
 
 
@@ -273,8 +273,8 @@ def job(
 
 
 def _list_jobs():
-    jobs = _get_all_jobs(show_progress=True)
-    table = rich.table.Table(title="Jobs")
+    jobs = _get_all_jobs()
+    table = rich.table.Table()
     table.add_column("Job ID")
     table.add_column("Job Name")
     table.add_column("User")
@@ -288,7 +288,7 @@ def _list_jobs():
             job.user,
             job.partition,
             ", ".join(job.nodes),
-            STATE_NAME_MAP[job.state],
+            STATE_DISPLAY_MAP[job.state],
         )
     rich.print(table)
 
