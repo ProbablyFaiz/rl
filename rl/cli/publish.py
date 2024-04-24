@@ -44,7 +44,7 @@ def publish(tag: str):
     repo = gh.get_repo(GITHUB_REPO)
     release_name = f"Release {tag}"
     release = repo.create_git_release(tag, release_name, release_name, draft=True)
-    release.upload_asset(str(DIST_FILE), label="rlp")
+    release.upload_asset(str(DIST_FILE), label="rl")
     release.update_release(release_name, release_name, draft=False)
 
 
