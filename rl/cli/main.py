@@ -451,9 +451,11 @@ def _select_node() -> str:
             node_name = f"{node} (job {job.job_id})"
             name_to_node_map[node_name] = node
             node_names.append(node_name)
-    selection = questionary.select(
-        "Select a node to ssh into", choices=node_names
-    ).ask()
+    selection = (
+        questionary.select("Select a node to ssh into", choices=node_names).ask()
+        if len(node_names) > 1
+        else node_names[0]
+    )
     return name_to_node_map[selection]
 
 
