@@ -340,7 +340,10 @@ def _get_all_jobs(show_progress=False):
         line = line.strip()
         if not line:
             continue
-        job_id, job_name, user, partition, nodes, state = line.split()
+        # Splitting on exactly one whitespace is important here,
+        #  split() by default treats multiple whitespaces as one,
+        #  which goes wrong when the nodes field is empty.
+        job_id, job_name, user, partition, nodes, state = line.split(" ")
         results.append(
             JobInfo(
                 job_id=job_id,
