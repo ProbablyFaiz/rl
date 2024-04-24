@@ -16,6 +16,7 @@ import questionary
 import regex
 import rich
 import rich.progress
+import rich.table
 from strenum import StrEnum
 
 from rl.cli.duo import Duo, DuoConfig
@@ -79,6 +80,12 @@ class JobInfo:
 class JobState(StrEnum):
     RUNNING = "R"
     PENDING = "PD"
+
+
+STATE_NAME_MAP = {
+    JobState.RUNNING: "Running",
+    JobState.PENDING: "Pending",
+}
 
 
 @click.group()
@@ -214,6 +221,14 @@ def job(
     if interactive:
         assert partition != "owners", "Cannot run interactive job on owners partition"
 
+    if slurm_args:
+        match slurm_args[0]:
+            case "list":
+                _list_jobs()
+                return
+            case _:
+                pass
+
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
     common_args = [
@@ -255,6 +270,27 @@ def job(
                 command or SHELL_PATH,
             ]
         )
+
+
+def _list_jobs():
+    jobs = _get_all_jobs(show_progress=True)
+    table = rich.table.Table(title="Jobs")
+    table.add_column("Job ID")
+    table.add_column("Job Name")
+    table.add_column("User")
+    table.add_column("Partition")
+    table.add_column("Nodes")
+    table.add_column("State")
+    for job in jobs:
+        table.add_row(
+            job.job_id,
+            job.job_name,
+            job.user,
+            job.partition,
+            ", ".join(job.nodes),
+            STATE_NAME_MAP[job.state],
+        )
+    rich.print(table)
 
 
 def create_batch_job(sbatch_args, name, job_time):
