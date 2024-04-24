@@ -28,13 +28,23 @@ def publish(tag: str):
     subprocess.run(["git", "tag", tag])
     subprocess.run(["git", "push", "origin", tag])
 
-    subprocess.run(["pyinstaller", "--onefile", str(ENTRY_POINT), "-n", DIST_FILE.name])
+    subprocess.run(
+        [
+            "pyinstaller",
+            "--onefile",
+            str(ENTRY_POINT),
+            "-n",
+            DIST_FILE.name,
+            "-p",
+            str(PROJECT_ROOT_DIR),
+        ]
+    )
 
     gh = github.Github(GITHUB_TOKEN)
     repo = gh.get_repo(GITHUB_REPO)
     release_name = f"Release {tag}"
     release = repo.create_git_release(tag, release_name, release_name, draft=True)
-    release.upload_asset(str(DIST_FILE), label="rl")
+    release.upload_asset(str(DIST_FILE), label="rlp")
     release.update_release(release_name, release_name, draft=False)
 
 
