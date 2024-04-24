@@ -430,6 +430,7 @@ def _ssh_within_sherlock(node: str):
     # When sshing in, we want to try to tmux attach and if that fails, just open a shell
     run_command = "tmux attach || fish || bash"
     ssh = pexpect.spawn(f"ssh {node} -t '{run_command}'")
+    threading.Thread(target=_resize_ssh, args=(ssh,)).start()
     ssh.interact()
 
 
