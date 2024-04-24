@@ -72,8 +72,7 @@ class JobInfo:
     job_name: str
     user: str
     partition: str
-    num_nodes: int
-    nodes: str
+    nodes: list[str]
     state: "JobState"
 
 
@@ -323,7 +322,9 @@ def _get_all_jobs(show_progress=False):
     if show_progress:
         with rich.progress.Progress() as progress:
             # noinspection PyTypeChecker
-            task = progress.add_task("Checking jobs in queue...", total=None)
+            task = progress.add_task(
+                "[green]Checking jobs in queue...[/green]", total=None
+            )
             results = _get_all_jobs(show_progress=False)
             progress.update(task, completed=1)
             return results
