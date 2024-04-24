@@ -181,10 +181,10 @@ def _must_run_on_sherlock(func: Callable):
     type=str,
 )
 @click.option(
-    "--batch",
-    "-b",
+    "--interactive",
+    "-i",
     is_flag=True,
-    help="Run as a batch job, then ssh into it. This is automatically set if partition is 'owners'.",
+    help="Run job interactively, rather than via batch. Not recommended.",
 )
 @click.option(
     "--command",
@@ -207,15 +207,12 @@ def job(
     cpus: int,
     mem: str,
     time: str,
-    batch: bool,
+    interactive: bool,
     command: str | None,
     slurm_args: list[str],
 ):
-    if partition == "owners":
-        batch = True
-
-    if command is not None:
-        assert batch is True, "Command can only be passed if running as a batch job"
+    if interactive:
+        assert partition != "owners", "Cannot run interactive job on owners partition"
 
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
@@ -245,7 +242,7 @@ def job(
             ]
         )
 
-    if batch:
+    if not interactive:
         create_batch_job(common_args, name, time)
     else:
         rich.print("[green]Starting interactive job...[/green]")
@@ -255,7 +252,7 @@ def job(
                 "srun",
                 *common_args,
                 "--pty",
-                SHELL_PATH,
+                command or SHELL_PATH,
             ]
         )
 
