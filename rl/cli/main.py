@@ -310,7 +310,7 @@ def create_batch_job(sbatch_args, name, job_time):
 @_must_run_on_sherlock
 def _get_all_jobs(show_progress=False):
     if show_progress:
-        with rich.progress.Progress() as progress:
+        with rich.progress.Progress(transient=True) as progress:
             # noinspection PyTypeChecker
             task = progress.add_task(
                 "[green]Checking jobs in queue...[/green]", total=None
