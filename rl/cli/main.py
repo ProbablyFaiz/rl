@@ -128,7 +128,7 @@ def _must_run_on_sherlock(func: Callable):
     return wrapper
 
 
-@cli.command(
+@cli.group(
     help="Create an interactive job, even on the owners partition",
     context_settings=dict(ignore_unknown_options=True),
 )
@@ -222,14 +222,6 @@ def job(
     if interactive:
         assert partition != "owners", "Cannot run interactive job on owners partition"
 
-    if slurm_args:
-        match slurm_args[0]:
-            case "list":
-                _list_jobs()
-                return
-            case _:
-                pass
-
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
     common_args = [
@@ -273,7 +265,9 @@ def job(
         )
 
 
-def _list_jobs():
+@job.command(name="list", help="List all jobs in the queue")
+@_must_run_on_sherlock
+def list_jobs():
     jobs = _get_all_jobs()
     table = rich.table.Table()
     table.add_column("Job ID")
@@ -294,6 +288,36 @@ def _list_jobs():
             job.time_remaining,
         )
     rich.print(table)
+
+
+@job.command(name="cancel", help="Cancel a running job")
+@click.argument("job_id", type=str, required=False)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip the confirmation prompt",
+)
+@_must_run_on_sherlock
+def cancel_job(job_id: str, yes: bool):
+    if not job_id:
+        job_id = _select_job()
+    if yes or click.confirm(f"Are you sure you want to cancel job {job_id}?"):
+        subprocess.run(["scancel", job_id])
+    rich.print(f"[red]Job {job_id} cancelled[/red]")
+
+
+def _select_job() -> str:
+    jobs = _get_all_jobs(show_progress=True)
+    job_ids = [job.job_id for job in jobs]
+    if not job_ids:
+        raise RLError("No jobs found to cancel.")
+    job_id = (
+        questionary.select("Select a job to cancel", choices=job_ids).ask()
+        if len(job_ids) > 1
+        else job_ids[0]
+    )
+    return job_id
 
 
 def create_batch_job(sbatch_args, name, job_time):
@@ -433,36 +457,6 @@ def _touch_file(path: Path):
 def approve():
     approve_duo_login()
     rich.print("[green]Duo login approved[/green]")
-
-
-@cli.command(help="Cancel a running job")
-@click.argument("job_id", type=str, required=False)
-@click.option(
-    "--yes",
-    "-y",
-    is_flag=True,
-    help="Skip the confirmation prompt",
-)
-@_must_run_on_sherlock
-def cancel(job_id: str, yes: bool):
-    if not job_id:
-        job_id = _select_job()
-    if yes or click.confirm(f"Are you sure you want to cancel job {job_id}?"):
-        subprocess.run(["scancel", job_id])
-    rich.print(f"[red]Job {job_id} cancelled[/red]")
-
-
-def _select_job() -> str:
-    jobs = _get_all_jobs(show_progress=True)
-    job_ids = [job.job_id for job in jobs]
-    if not job_ids:
-        raise RLError("No jobs found to cancel.")
-    job_id = (
-        questionary.select("Select a job to cancel", choices=job_ids).ask()
-        if len(job_ids) > 1
-        else job_ids[0]
-    )
-    return job_id
 
 
 @cli.command(help="SSH into Sherlock or into a particular job while on Sherlock")
