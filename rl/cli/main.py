@@ -75,6 +75,7 @@ class JobInfo:
     partition: str
     nodes: list[str]
     state: "JobState"
+    time_elapsed: str
     time_remaining: str
 
 
@@ -282,6 +283,7 @@ def _list_jobs():
     table.add_column("Partition")
     table.add_column("Nodes")
     table.add_column("State")
+    table.add_column("Time Elapsed")
     table.add_column("Time Remaining")
     for job in jobs:
         table.add_row(
@@ -291,6 +293,7 @@ def _list_jobs():
             job.partition,
             ", ".join(job.nodes),
             STATE_DISPLAY_MAP[job.state],
+            job.time_elapsed,
             job.time_remaining,
         )
     rich.print(table)
@@ -359,7 +362,7 @@ def _get_all_jobs(show_progress=False):
             return results
 
     output = subprocess.run(
-        ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t %L"],
+        ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t %M %L"],
         stdout=subprocess.PIPE,
         text=True,
         check=True,
@@ -372,9 +375,16 @@ def _get_all_jobs(show_progress=False):
         # Splitting on exactly one whitespace is important here,
         #  split() by default treats multiple whitespaces as one,
         #  which goes wrong when the nodes field is empty.
-        job_id, job_name, user, partition, nodes, state, time_remaining = line.split(
-            " "
-        )
+        (
+            job_id,
+            job_name,
+            user,
+            partition,
+            nodes,
+            state,
+            time_elapsed,
+            time_remaining,
+        ) = line.split(" ")
         results.append(
             JobInfo(
                 job_id=job_id,
@@ -383,6 +393,7 @@ def _get_all_jobs(show_progress=False):
                 partition=partition,
                 nodes=parse_nodes_str(nodes),
                 state=state,
+                time_elapsed=time_elapsed,
                 time_remaining=time_remaining,
             )
         )
@@ -457,7 +468,7 @@ def _select_job() -> str:
     job_names = []
     job_name_id_map = {}
     for job in jobs:
-        job_name = f"{job.job_id} ({', '.join(job.nodes)}; {job.job_name})"
+        job_name = f"{job.job_id} ({', '.join(job.nodes)}; partition='{job.partition}'; {job.state})"
         job_names.append(job_name)
         job_name_id_map[job_name] = job.job_id
     selection = (
