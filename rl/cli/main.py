@@ -237,7 +237,7 @@ def job(
         partition,
         "--job-name",
         name,
-        "--cpus-per-gpu" if gpus else "--cpus",
+        "--cpus-per-gpu" if gpus else "--cpus-per-task",
         str(cpus),
         "--mem",
         mem,
@@ -305,9 +305,9 @@ def create_batch_job(sbatch_args, name, job_time):
     sbatch_args = [
         "sbatch",
         "--output",
-        f"{LOG_DIR}/{name}-%j.out",
+        f"{LOG_DIR}/{name}.out",
         "--error",
-        f"{LOG_DIR}/{name}-%j.err",
+        f"{LOG_DIR}/{name}.err",
         *sbatch_args,
         "--wrap",
         f"tmux new-session -d -s rl && python -c 'import time; time.sleep({sleep_time})'",
@@ -454,15 +454,18 @@ def cancel(job_id: str, yes: bool):
 
 def _select_job() -> str:
     jobs = _get_all_jobs(show_progress=True)
-    job_ids = [job.job_id for job in jobs]
-    if not job_ids:
-        raise RLError("No jobs found to cancel.")
-    job_id = (
-        questionary.select("Select a job to cancel", choices=job_ids).ask()
-        if len(job_ids) > 1
-        else job_ids[0]
+    job_names = []
+    job_name_id_map = {}
+    for job in jobs:
+        job_name = f"{job.job_id} ({', '.join(job.nodes)}; {job.job_name})"
+        job_names.append(job_name)
+        job_name_id_map[job_name] = job.job_id
+    selection = (
+        questionary.select("Select a job to cancel", choices=job_names).ask()
+        if len(job_names) > 1
+        else job_names[0]
     )
-    return job_id
+    return job_name_id_map[selection]
 
 
 @cli.command(help="SSH into Sherlock or into a particular job while on Sherlock")
