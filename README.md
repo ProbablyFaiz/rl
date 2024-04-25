@@ -6,12 +6,12 @@ RL is a command-line tool which makes interacting with [Sherlock](https://www.sh
 
 On your local machine:
 ```bash
-pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git@v0.4.0"
+pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git@v0.4.1"
 ```
 
 On Sherlock, you should probably use the pre-compiled binary instead:
 ```bash
-wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.4.0/rl" -O ~/.local/bin/rl
+wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.4.1/rl" -O ~/.local/bin/rl
 ```
 
 
