@@ -47,7 +47,7 @@ LOG_DIR = Path("/scratch/users") / CURRENT_USER / "logs"
 
 CHECK_BATCH_EVERY = 10
 
-DEFAULT_JOB_NAME = f"rl-{datetime.datetime.now().strftime('%m-%d-%H-%M-%S')}"
+DEFAULT_JOB_NAME = f"rl_{datetime.datetime.now().strftime('%m-%d_%H-%M')}"
 
 BASE_CONFIG_DIR = Path("~/.config/rl").expanduser()
 
@@ -494,7 +494,7 @@ def _ssh_into_sherlock(node: str):
 def _ssh_within_sherlock(node: str):
     if not node:
         node = _select_node()
-    rich.print(f"[green]SSHing into {node}[/green]")
+    rich.print(f"[green]SSHing into {node}...[/green]")
     # When SSHing in, we want to try to tmux attach and if that fails, just open a shell
     run_command = "tmux attach || fish || bash"
     subprocess.run([SSH_PATH, node, "-t", run_command])
