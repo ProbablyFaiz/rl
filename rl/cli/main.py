@@ -342,11 +342,9 @@ def create_batch_job(sbatch_args, name, job_time):
             f"[green]Job {curr_job.job_id} started on node {curr_job.nodes[0]}. SSHing into node...[/green]"
         )
     _ssh_within_sherlock(curr_job.nodes[0])
-    if click.confirm("Left the job, do you want to cancel it?"):
-        subprocess.run(["scancel", curr_job.job_id])
-        rich.print("[red]Job ended[/red]")
-    else:
-        rich.print(f"[green]Job {curr_job.job_id} will continue running[/green]")
+    rich.print(
+        f"[green]Job {curr_job.job_id} will continue running. Run [yellow]rl cancel {curr_job.job_id}[/yellow] to cancel it.[/green]"
+    )
 
 
 @_must_run_on_sherlock
@@ -496,7 +494,7 @@ def _ssh_into_sherlock(node: str):
 
     node = node or credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
-    rich.print(f"[green]Logging you in to {node_url}[/green]")
+    rich.print(f"[green]Logging you in to {node_url}...[/green]")
     ssh_command = f"ssh -o StrictHostKeyChecking=no {credentials['username']}@{node_url} -t 'fish || bash'"
     _run_sherlock_ssh(ssh_command, credentials, duo)
 
