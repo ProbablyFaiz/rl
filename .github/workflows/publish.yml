@@ -1,5 +1,10 @@
 name: Build and Publish Python Package
 
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
 jobs:
   build:
     strategy:
