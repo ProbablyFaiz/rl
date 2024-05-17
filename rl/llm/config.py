@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import TypedDict
 
 import torch
-from transformers import AutoConfig, BitsAndBytesConfig
+from transformers import AutoConfig, BitsAndBytesConfig, PreTrainedTokenizer
 
 import rl.utils.io
 from rl.utils import LOGGER
@@ -22,18 +21,18 @@ class LLMConfig:
     visible_devices: str | None = None
 
     def __post_init__(self):
-        if model_override := cdle.utils.io.getenv("MODEL_OVERRIDE"):
+        if model_override := rl.utils.io.getenv("MODEL_OVERRIDE"):
             LOGGER.warning(
                 f"Using model override: {model_override}. This will override the model name or path provided."
             )
             self.model_name_or_path = model_override
-        if lora_override := cdle.utils.io.getenv("LORA_OVERRIDE"):
+        if lora_override := rl.utils.io.getenv("LORA_OVERRIDE"):
             LOGGER.warning(
                 f"Using LORA override: {lora_override}. This will override the LORA name or path provided."
             )
             self.lora_name_or_path = lora_override
 
-        if context_window_override := cdle.utils.io.getenv("CONTEXT_WINDOW"):
+        if context_window_override := rl.utils.io.getenv("CONTEXT_WINDOW"):
             LOGGER.warning(
                 f"Using context window override: {context_window_override}. This will override the context window size provided."
             )
@@ -57,7 +56,7 @@ class QuantizationType(str, Enum):
 
 
 def get_quantization_config(quant_type: str = None) -> BitsAndBytesConfig | None:
-    quant_config = cdle.utils.io.getenv("QUANT", default="").lower() or quant_type
+    quant_config = rl.utils.io.getenv("QUANT", default="").lower() or quant_type
     if quant_config == QuantizationType.FOUR_BIT:
         return BitsAndBytesConfig(
             load_in_4bit=True,
@@ -90,7 +89,9 @@ class KShotPrompt(TypedDict):
     examples: list[KShotExample]
 
 
-def get_k_shot_prompt(k_shot: KShotPrompt, prompt: str, tokenizer) -> str:
+def get_k_shot_prompt(
+    k_shot: KShotPrompt, prompt: str, tokenizer: PreTrainedTokenizer
+) -> str:
     messages = [
         {
             "role": "system",
