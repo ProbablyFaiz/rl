@@ -43,6 +43,32 @@ def get_model_path(*args) -> Path:
     return get_data_path("models", *args)
 
 
+def get_figures_path(*args) -> Path:
+    """Get the path to a file nested in the figures directory. If the FIGURES_ROOT environment
+    variable is set, use that as the root directory. Otherwise, use the figures directory
+    in the project root.
+
+    Args:
+        *args: The path components (strings or Path objects) to append to the figures root.
+    """
+    if figures_root := getenv("FIGURES_ROOT"):
+        return Path(figures_root).joinpath(*args)
+    return get_project_root().joinpath("figures", *args)
+
+
+def get_tables_path(*args) -> Path:
+    """Get the path to a file nested in the figures directory. If the FIGURES_ROOT environment
+    variable is set, use that as the root directory. Otherwise, use the figures directory
+    in the project root.
+
+    Args:
+        *args: The path components (strings or Path objects) to append to the figures root.
+    """
+    if tables_root := getenv("TABLES_ROOT"):
+        return Path(tables_root).joinpath(*args)
+    return get_project_root().joinpath("tables", *args)
+
+
 def getenv(name: str, default=None) -> str:
     """Get an environment variable. If the variable is not set, return the default value.
 
