@@ -16,8 +16,9 @@ requires-python = ">=3.9"
 dependencies = [
     "click",
     "rich",
+    "tqdm",
     "pexpect",
-    "pyopt",
+    "pyotp",
     "requests",
     "pycryptodome",
     "appdirs",
@@ -27,6 +28,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+llm = [
+    "vllm",
+    "torch",
+    "openai",
+    "transformers",
+    "huggingface_hub",
+]
 dev = [
     "pygithub",
     "pyinstaller",
