@@ -1,6 +1,7 @@
-import glob
+import csv
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -17,9 +18,7 @@ def ensure_dotenv_loaded():
 
 
 def get_project_root() -> Path:
-    """Get the root directory of the project."""
-    if project_root := getenv("PROJECT_ROOT"):
-        return Path(project_root)
+    """Get the path to the project root directory."""
     return Path(__file__).parent.parent.parent
 
 
@@ -33,33 +32,15 @@ def get_data_path(*args) -> Path:
     """
     if data_root := getenv("DATA_ROOT"):
         return Path(data_root).joinpath(*args)
-    return get_project_root().joinpath("data", *args)
+    raise ValueError("DATA_ROOT environment variable is not set.")
+
+
+def get_cache_dir(*args) -> Path:
+    return get_data_path("cache", *args)
 
 
 def get_model_path(*args) -> Path:
-    """Get the path to a file nested in the models directory. If the MODELS_ROOT environment
-    variable is set, use that as the root directory. Otherwise, use the models directory
-    in the project root.
-
-    Args:
-        *args: The path components (strings or Path objects) to append to the models root.
-    """
-    if models_root := getenv("MODELS_ROOT"):
-        return Path(models_root).joinpath(*args)
     return get_data_path("models", *args)
-
-
-def get_figures_path(*args) -> Path:
-    """Get the path to a file nested in the figures directory. If the FIGURES_ROOT environment
-    variable is set, use that as the root directory. Otherwise, use the figures directory
-    in the project root.
-
-    Args:
-        *args: The path components (strings or Path objects) to append to the figures root.
-    """
-    if figures_root := getenv("FIGURES_ROOT"):
-        return Path(figures_root).joinpath(*args)
-    return get_project_root().joinpath("figures", *args)
 
 
 def getenv(name: str, default=None) -> str:
@@ -73,11 +54,6 @@ def getenv(name: str, default=None) -> str:
     """
     ensure_dotenv_loaded()
     return os.getenv(name, default)
-
-
-def setenv(name: str, value: str) -> None:
-    """Set an environment variable."""
-    os.environ[name] = value
 
 
 def read_jsonl(filename: str | Path) -> Iterable[Any]:
@@ -96,13 +72,50 @@ def write_jsonl(filename: str | Path, records: Iterable[Any], overwrite=False) -
             f.write(json.dumps(record) + "\n")
 
 
-def read_json(filename: str | Path) -> Any:
+def write_jsonl_spark(filename: str | Path, df, overwrite=False) -> None:
+    if isinstance(filename, str):
+        filename = Path(filename)
+    if filename.exists() and not overwrite:
+        raise ValueError(f"{filename} already exists and overwrite is not set.")
+    output_path_dir_name = filename.parent / f"{filename.stem}_dir"
+    df.coalesce(1).write.json(str(output_path_dir_name), lineSep="\n", mode="overwrite")
+    output_path_dir = list(output_path_dir_name.glob("*.json"))[0]
+    shutil.move(output_path_dir, filename)
+    shutil.rmtree(output_path_dir_name)
+
+
+def write_parquet_spark(filename: str | Path, df, overwrite=False) -> None:
+    if isinstance(filename, str):
+        filename = Path(filename)
+    if filename.exists() and not overwrite:
+        raise ValueError(f"{filename} already exists and overwrite is not set.")
+
+    output_path_dir_name = filename.parent / f"{filename.stem}_dir"
+    df.coalesce(1).write.parquet(str(output_path_dir_name), mode="overwrite")
+    parquet_file = list(output_path_dir_name.glob("*.parquet"))[0]
+    shutil.move(parquet_file, filename)
+    shutil.rmtree(output_path_dir_name)
+
+
+def read_csv(filename: str | Path) -> Iterable[dict[str, Any]]:
     with open(filename, "r") as f:
-        return json.load(f)
+        reader = csv.DictReader(f)
+        for row in reader:
+            yield row
 
 
-def glob_to_files(glob_pattern: Path | str) -> list[Path]:
-    """Convert a glob pattern to a list of files."""
-    if isinstance(glob_pattern, str):
-        glob_pattern = Path(glob_pattern)
-    return sorted(map(Path, glob.glob(str(glob_pattern))))
+def write_csv(
+    filename: str | Path,
+    records: Iterable[dict[str, Any]],
+    *,
+    field_names: list[str] | None = None,
+    overwrite=False,
+) -> None:
+    if isinstance(filename, str):
+        filename = Path(filename)
+    if filename.exists() and not overwrite:
+        raise ValueError(f"{filename} already exists and overwrite is not set.")
+    with open(filename, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=field_names)
+        writer.writeheader()
+        writer.writerows(records)

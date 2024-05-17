@@ -39,5 +39,7 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-# logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 LOGGER = get_logger(__name__)
+
+logging.getLogger().setLevel(logging.WARNING)
+LOGGER.setLevel(logging.INFO)
