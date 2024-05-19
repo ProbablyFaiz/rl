@@ -48,7 +48,7 @@ dev = [
 ]
 
 [project.urls]
-homepage = "https://github.com/reglab/rl"
+homepage = "https://github.com/ProbablyFaiz/rl"
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
