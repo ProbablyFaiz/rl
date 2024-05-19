@@ -25,6 +25,7 @@ dependencies = [
     "regex",
     "questionary",
     "StrEnum",
+	"python-dotenv",
 ]
 
 [project.optional-dependencies]
@@ -56,9 +57,6 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 rl = "rl.cli.main:cli"
-
-# [tool.setuptools]
-# packages = ["rl"]
 
 [tool.setuptools.packages]
 find = {}
