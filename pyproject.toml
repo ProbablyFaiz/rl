@@ -60,6 +60,9 @@ rl = "rl.cli.main:cli"
 [tool.setuptools]
 packages = ["rl"]
 
+[tool.setuptools.packages]
+find = {}
+
 [tool.isort]
 profile = "black"
 src_paths = ["rl"]
