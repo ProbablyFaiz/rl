@@ -28,6 +28,7 @@ dependencies = [
     "StrEnum",
     "python-dotenv",
     "matplotlib",
+    "pandas",
 ]
 
 [project.optional-dependencies]

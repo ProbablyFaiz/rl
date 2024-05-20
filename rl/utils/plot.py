@@ -3,7 +3,7 @@ This module provides a decorator-based interface for creating figures and tables
 
 >>> import pandas as pd
 >>> from rl.utils import plot
->>> from rl import io
+>>> from rl.utils import io
 >>> import matplotlib.pyplot as plt
 >>> @plot.figure
 ... def my_plot():
@@ -29,7 +29,7 @@ from matplotlib.figure import Figure
 from pandas import DataFrame
 from tqdm import tqdm
 
-from rl import io
+from rl.utils import io
 
 PlotMethod = Callable[None, Figure]
 TableMethod = Callable[None, DataFrame]
