@@ -26,6 +26,7 @@ dependencies = [
     "regex",
     "questionary",
     "StrEnum",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
