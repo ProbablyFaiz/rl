@@ -20,15 +20,16 @@ This module provides a decorator-based interface for creating figures and tables
 >>> plot.clean()
 """
 
+import glob
+import os
+from typing import Callable, Dict, List
+
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from pandas import DataFrame
 from tqdm import tqdm
 
 from rl import io
-import os
-import glob
-from typing import List, Dict, Callable
 
 PlotMethod = Callable[None, Figure]
 TableMethod = Callable[None, DataFrame]
