@@ -3,6 +3,7 @@ name = "rl"
 version = "0.5.0"
 authors = [
     { name = "Faiz Surani", email = "faiz@law.stanford.edu" },
+    { name = "Varun Magesh", email="vim@law.stanford.edu" }
 ]
 description = "A CLI for various RegLab / Sherlock tasks"
 readme = "README.md"
@@ -25,12 +26,12 @@ dependencies = [
     "regex",
     "questionary",
     "StrEnum",
-	"python-dotenv",
 ]
 
 [project.optional-dependencies]
 llm = [
-    "vllm",
+    "vllm>=0.4.0; platform_system == 'Linux'",
+    "flash-attn; platform_system == 'Linux'",
     "torch",
     "openai",
     "transformers",
