@@ -27,6 +27,7 @@ dependencies = [
     "questionary",
     "StrEnum",
     "python-dotenv",
+    "matplotlib",
 ]
 
 [project.optional-dependencies]
