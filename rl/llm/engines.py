@@ -9,11 +9,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, Union
+from transformers import AutoTokenizer
 
 import huggingface_hub
 import torch
 import tqdm.asyncio
-from openai import OpenAI
+import openai
 
 import rl.utils.io
 from rl.llm.config import LLMConfig
@@ -30,9 +31,12 @@ if torch.cuda.is_available():
     from vllm.lora.request import LoRARequest
 
 
+InferenceInput = Union[str, openai.types.chat.ChatCompletionMessageParam]
+
+
 @dataclass(frozen=True)
 class InferenceOutput:
-    prompt: str
+    prompt: InferenceInput
     text: str
     metadata: dict[str, Any]  # For now, not used for anything
 
@@ -51,8 +55,17 @@ class InferenceEngine(ABC):
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
+    def apply_chat_template(self, messages):
+        if not hasattr(self, tokenizer):
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.llm_config.tokenizer_name_or_path
+            )
+        return self.tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, tokenize=False
+        )
+
     @abstractmethod
-    def generate(self, prompt: str) -> InferenceOutput:
+    def generate(self, prompt: InferenceInput) -> InferenceOutput:
         """Given the input prompt, returns the generated text.
 
         Args:
@@ -63,7 +76,7 @@ class InferenceEngine(ABC):
         """
         pass
 
-    def batch_generate(self, prompts: list[str]) -> list[InferenceOutput]:
+    def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
         """Given the input prompts, returns the generated texts.
 
         Args:
@@ -73,6 +86,54 @@ class InferenceEngine(ABC):
             The generated texts (not including the prompts).
         """
         return [self.generate(prompt) for prompt in prompts]
+
+
+class ClientEngine(ABC):
+    NAME: str
+    BASE_URL: str
+    API_KEY_NAME: str
+    llm_config: LLMConfig
+
+    def __init__(self, llm_config: LLMConfig):
+        rl.utils.io.ensure_dotenv_loaded()
+        self.llm_config = llm_config
+        self.client = openai.OpenAI(
+            api_key=rl.utils.io.getenv(self.API_KEY_NAME), base_url=self.BASE_URL
+        )
+
+    def generate(
+        self, prompt: openai.types.chat.ChatCompletionMessageParam
+    ) -> InferenceOutput:
+        """Given the input prompt, returns the generated text.
+
+        Args:
+            prompt: The input prompt.
+
+        Returns:
+            The generated text (not including the prompt).
+        """
+        if isinstance(prompt, str):
+            raise ValueError(
+                "ClientEngine requires a list of dicts, in the OpenAI API style."
+            )
+
+        response = client.chat.completions.create(
+            model=self.llm_config.model_name_or_path, messages=prompt
+        )
+        return InferenceOutput(
+            propmt=prompt,
+            text=response.choices[0].message.content,
+            metadata={
+                "model": eslf.llm_config.model_name_or_path,
+                "base_url": self.BASE_URL,
+            },
+        )
+
+
+class TogetherEngine(ClientEngine):
+    NAME = "together-engine"
+    BASE_URL = "https://api.together.xyz/v1"
+    API_KEY_NAME = "TOGETHER_API_KEY"
 
 
 class AsyncInferenceEngine:
@@ -104,7 +165,7 @@ class AsyncInferenceEngine:
         """
         pass
 
-    async def generate(self, prompt: str) -> InferenceOutput:
+    async def generate(self, prompt: InferenceInput) -> InferenceOutput:
         """Given the input prompt, returns the generated text.
 
         Args:
@@ -113,13 +174,17 @@ class AsyncInferenceEngine:
         Returns:
             The generated text (not including the prompt).
         """
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         res = None
         async for res in self.stream(prompt):
             pass
         return res
 
     @abstractmethod
-    async def batch_generate(self, prompts: list[str]) -> list[InferenceOutput]:
+    async def batch_generate(
+        self, prompts: list[InferenceInput]
+    ) -> list[InferenceOutput]:
         """Given the input prompts, returns the generated texts.
 
         Args:
@@ -128,7 +193,12 @@ class AsyncInferenceEngine:
         Returns:
             The generated texts (not including the prompts).
         """
-        tasks = [self.generate(prompt) for prompt in prompts]
+        tasks = [
+            self.generate(
+                prompt if isinstance(prompt, str) else self.apply_chat_template(prompt)
+            )
+            for prompt in prompts
+        ]
         return await tqdm.asyncio.tqdm.gather(*tasks)
 
 
@@ -225,9 +295,14 @@ class VLLMEngine(InferenceEngine):
         del self.vllm
 
     def generate(self, prompt: str) -> InferenceOutput:
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         return self.batch_generate([prompt])[0]
 
-    def batch_generate(self, prompts: list[str]) -> list[InferenceOutput]:
+    def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
+        prompts = [
+            prompt if isinstance(prompt, str) else self.apply_chat_template(prompt)
+        ]
         vllm_outputs = self._get_vllm_outputs(prompts)
 
         inference_outputs = []
@@ -334,7 +409,9 @@ class WorkerVLLMEngine(InferenceEngine):
         self.server.terminate()
         self.server.wait()
 
-    def generate(self, prompt: str) -> InferenceOutput:
+    def generate(self, prompt: InferenceInput) -> InferenceOutput:
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         res = self.client.completions.create(
             model=self.llm_config.model_name_or_path,
             prompt=prompt,
@@ -344,7 +421,9 @@ class WorkerVLLMEngine(InferenceEngine):
         )
         return self._wrap_output(prompt, res.choices[0].text)
 
-    def stream(self, prompt: str) -> Iterator[InferenceOutput]:
+    def stream(self, prompt: InferenceInput) -> Iterator[InferenceOutput]:
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         completion = self.client.completions.create(
             model=self.llm_config.model_name_or_path,
             prompt=prompt,
@@ -358,7 +437,7 @@ class WorkerVLLMEngine(InferenceEngine):
             curr_text += chunk.choices[0].text
             yield self._wrap_output(prompt, curr_text)
 
-    def _wrap_output(self, prompt: str, output: str) -> InferenceOutput:
+    def _wrap_output(self, prompt: InferenceInput, output: str) -> InferenceOutput:
         return InferenceOutput(
             prompt=prompt,
             text=output,
@@ -390,7 +469,11 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
     async def __aexit__(self, exc_type, exc_value, traceback):
         del self.vllm
 
-    async def stream(self, prompt: str) -> AsyncGenerator[InferenceOutput, bool]:
+    async def stream(
+        self, prompt: InferenceInput
+    ) -> AsyncGenerator[InferenceOutput, bool]:
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         curr_uuid = str(uuid.uuid4())
         result_generator = self.vllm.generate(
             prompt,
@@ -404,7 +487,9 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
                 await self.vllm.abort(curr_uuid)
                 break
 
-    async def generate(self, prompt: str) -> InferenceOutput:
+    async def generate(self, prompt: InferenceInput) -> InferenceOutput:
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         res = None
         async for res in self.stream(prompt):
             pass
@@ -445,7 +530,9 @@ class LlamaCppEngine(InferenceEngine):
     def __exit__(self, exc_type, exc_value, traceback):
         del self.model
 
-    def generate(self, prompt: str) -> InferenceOutput:
+    def generate(self, prompt: InferenceInput) -> InferenceOutput:
+        if not isinstance(prompt, str):
+            prompt = self.apply_chat_template(prompt)
         res = self.model(prompt, max_tokens=self.llm_config.max_new_tokens)
         return InferenceOutput(
             prompt=prompt, text=res["choices"][0]["text"], metadata={}
