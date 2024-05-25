@@ -12,6 +12,7 @@ from rl.utils import LOGGER
 @dataclass
 class LLMConfig:
     model_name_or_path: str
+    tokenizer_name_or_path: str = ""
     lora_name_or_path: str = None
     context_window_tokens: int = None
     max_new_tokens: int = 2048
