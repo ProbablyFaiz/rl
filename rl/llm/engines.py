@@ -9,12 +9,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, Union
-from transformers import AutoTokenizer
 
 import huggingface_hub
+import openai
 import torch
 import tqdm.asyncio
-import openai
+from transformers import AutoTokenizer
 
 import rl.utils.io
 from rl.llm.config import LLMConfig
