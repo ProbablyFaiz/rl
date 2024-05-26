@@ -117,14 +117,14 @@ class ClientEngine(ABC):
                 "ClientEngine requires a list of dicts, in the OpenAI API style."
             )
 
-        response = client.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.llm_config.model_name_or_path, messages=prompt
         )
         return InferenceOutput(
-            propmt=prompt,
+            prompt=prompt,
             text=response.choices[0].message.content,
             metadata={
-                "model": eslf.llm_config.model_name_or_path,
+                "model": self.llm_config.model_name_or_path,
                 "base_url": self.BASE_URL,
             },
         )
