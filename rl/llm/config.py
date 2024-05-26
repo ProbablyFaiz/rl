@@ -39,15 +39,21 @@ class LLMConfig:
             )
             self.context_window_tokens = int(context_window_override)
         elif self.context_window_tokens is None:
-            cfg = AutoConfig.from_pretrained(self.model_name_or_path)
-            if hasattr(cfg, "model_max_length"):
-                self.context_window_tokens = cfg.model_max_length
-            elif hasattr(cfg, "max_position_embeddings"):
-                self.context_window_tokens = cfg.max_position_embeddings
-            LOGGER.warning(
-                f"No context window size provided. Guessing the model's max size based on its config: "
-                f"{self.context_window_tokens}. You can override this by providing the env variable CONTEXT_WINDOW."
-            )
+            try:
+                cfg = AutoConfig.from_pretrained(self.model_name_or_path)
+                if hasattr(cfg, "model_max_length"):
+                    self.context_window_tokens = cfg.model_max_length
+                elif hasattr(cfg, "max_position_embeddings"):
+                    self.context_window_tokens = cfg.max_position_embeddings
+                LOGGER.warning(
+                    f"No context window size provided. Guessing the model's max size based on its config: "
+                    f"{self.context_window_tokens}. You can override this by providing the env variable CONTEXT_WINDOW."
+                )
+            except OSError:
+                LOGGER.warning(
+                    f"No context window size provided, and it could not be inferred. "
+                    f"Setting context_window_tokens to None; this may cause downstream errors."
+                )
 
 
 class QuantizationType(str, Enum):

@@ -20,7 +20,7 @@ import rl.utils.io
 from rl.llm.config import LLMConfig
 from rl.utils import LOGGER
 
-if torch.cuda.is_available():
+if torch.cuda.is_available() and rl.utils.io.getenv("USE_GPU", "true").lower() != "false":
     from vllm import (
         AsyncEngineArgs,
         AsyncLLMEngine,
@@ -346,7 +346,7 @@ class VLLMEngine(InferenceEngine):
 class WorkerVLLMEngine(InferenceEngine):
     NAME = "server_vllm"
 
-    client: OpenAI
+    client: openai.OpenAI
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
