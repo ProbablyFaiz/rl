@@ -20,7 +20,10 @@ import rl.utils.io
 from rl.llm.config import LLMConfig
 from rl.utils import LOGGER
 
-if torch.cuda.is_available() and rl.utils.io.getenv("USE_GPU", "true").lower() != "false":
+if (
+    torch.cuda.is_available()
+    and rl.utils.io.getenv("USE_GPU", "true").lower() != "false"
+):
     from vllm import (
         AsyncEngineArgs,
         AsyncLLMEngine,

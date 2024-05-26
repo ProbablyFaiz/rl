@@ -2,6 +2,7 @@
 - https://github.com/ivanov/duo-hotp/
 - https://github.com/falsidge/ruo
 """
+
 import base64
 import dataclasses
 import datetime

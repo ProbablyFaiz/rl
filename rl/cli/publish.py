@@ -1,4 +1,5 @@
 """Builds the RL library with pyinstaller (--onefile) and uploads it to the specified GitHub release."""
+
 import os
 import subprocess
 from pathlib import Path
