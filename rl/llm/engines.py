@@ -14,6 +14,7 @@ import huggingface_hub
 import openai
 import torch
 import tqdm.asyncio
+from openai.types.chat import ChatCompletionMessageParam
 from transformers import AutoTokenizer
 
 import rl.utils.io
@@ -34,7 +35,7 @@ if (
     from vllm.lora.request import LoRARequest
 
 
-InferenceInput = Union[str, openai.types.chat.ChatCompletionMessageParam]
+InferenceInput = Union[str, ChatCompletionMessageParam]
 
 
 @dataclass(frozen=True)
