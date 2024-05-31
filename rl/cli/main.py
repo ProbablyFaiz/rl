@@ -547,7 +547,7 @@ def _select_node() -> str:
 @_requires_sherlock_credentials
 def scp(direction: str, source: str, destination: str, scp_options: list[str]):
     credentials = cast(dict[str, str], _read_credentials())
-    duo = Duo.from_config(_read_duo())
+    duo = Duo.from_config(cast(DuoConfig, _read_duo()))
 
     node = credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
@@ -576,8 +576,8 @@ def _run_sherlock_ssh(ssh_command: str, credentials: dict[str, str], duo: Duo):
     option_to_select = _MFA_LINE_REGEX.search(duo_output)
     if not option_to_select:
         raise RLError("Could not find Duo MFA option")
-    option_to_select = option_to_select.group("number")
-    ssh.sendline(option_to_select)
+    option_number = option_to_select.group("number")
+    ssh.sendline(option_number)
     # Clear the buffer before we hand over control to the user
     ssh.expect("\n")
 

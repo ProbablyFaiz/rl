@@ -8,7 +8,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncGenerator, Coroutine, Iterator, Union, cast
+from typing import Any, AsyncGenerator, Iterator, Union, cast
 
 import huggingface_hub
 import openai
@@ -16,7 +16,7 @@ import torch
 import tqdm.asyncio
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer
 
 import rl.utils.io
 from rl.llm.config import LLMConfig
@@ -142,6 +142,7 @@ class TogetherEngine(ClientEngine):
 class AsyncInferenceEngine:
     NAME: str
     llm_config: LLMConfig
+    tokenizer: PreTrainedTokenizer
 
     def __init__(self, llm_config: LLMConfig):
         rl.utils.io.ensure_dotenv_loaded()
@@ -199,7 +200,9 @@ class AsyncInferenceEngine:
         """
         tasks = [
             self.generate(
-                prompt if isinstance(prompt, str) else self.apply_chat_template(prompt)
+                prompt
+                if isinstance(prompt, str)
+                else _apply_chat_template(self.tokenizer, prompt)
             )
             for prompt in prompts
         ]
@@ -218,11 +221,10 @@ def _get_vllm_engine(
     engine_args_kwargs = _get_vllm_kwargs(llm_config)
     engine_cls = AsyncLLMEngine if use_async else LLMEngine
     engine_args_cls = AsyncEngineArgs if use_async else EngineArgs
-    # noinspection PyArgumentList
-    engine_args = engine_args_cls(**engine_args_kwargs)
+    engine_args = engine_args_cls(**engine_args_kwargs)  # type: ignore
     if use_async:
         engine_args.disable_log_requests = True
-    engine = engine_cls.from_engine_args(engine_args)
+    engine = engine_cls.from_engine_args(engine_args)  # type: ignore
 
     sampling_params = SamplingParams(
         max_tokens=llm_config.max_new_tokens,
@@ -241,12 +243,12 @@ def _get_vllm_engine(
         else:
             lora_path = lora_path.resolve()
 
-    generate_kwargs = {
+    generate_kwargs: dict[str, Any] = {
         "sampling_params": sampling_params,
     }
     if lora_path is not None:
         generate_kwargs["lora_request"] = LoRARequest(
-            lora_name=llm_config.lora_name_or_path,
+            lora_name=cast(str, llm_config.lora_name_or_path),
             lora_int_id=1,
             lora_local_path=str(lora_path),
         )
@@ -305,7 +307,7 @@ class VLLMEngine(InferenceEngine):
         return self.batch_generate([prompt])[0]
 
     def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
-        prompts: list[str] = [
+        formatted_prompts: list[str] = [
             (
                 prompt
                 if isinstance(prompt, str)
@@ -313,7 +315,7 @@ class VLLMEngine(InferenceEngine):
             )
             for prompt in prompts
         ]
-        vllm_outputs = self._get_vllm_outputs(prompts)
+        vllm_outputs = self._get_vllm_outputs(formatted_prompts)
 
         inference_outputs = []
         for prompt, output in zip(prompts, vllm_outputs):

@@ -14,7 +14,7 @@ class LLMConfig:
     model_name_or_path: str
     tokenizer_name_or_path: str = ""
     lora_name_or_path: str | None = None
-    context_window_tokens: int = None
+    context_window_tokens: int = 0
     max_new_tokens: int = 2048
     temperature: float = 0.0
     frequency_penalty: float = 0.05  # Experiment with this
@@ -40,7 +40,7 @@ class LLMConfig:
                 f"Using context window override: {context_window_override}. This will override the context window size provided."
             )
             self.context_window_tokens = int(context_window_override)
-        elif self.context_window_tokens is None:
+        elif not self.context_window_tokens:
             try:
                 cfg = AutoConfig.from_pretrained(self.model_name_or_path)
                 if hasattr(cfg, "model_max_length"):

@@ -71,3 +71,6 @@ find = {}
 profile = "black"
 src_paths = ["rl"]
 skip_gitignore = true
+
+[tool.mypy]
+disable_error_code = ["import", "override"]
