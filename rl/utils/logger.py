@@ -9,14 +9,14 @@ class LogFormatter(logging.Formatter):
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
     datefmt = "%Y-%m-%d %H:%M:%S"
-    format = "%(asctime)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+    base_style = "%(asctime)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
 
-    FORMATS = {
-        logging.DEBUG: grey + format + reset,
-        logging.INFO: white + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset,
+    FORMATS: dict[int, str] = {
+        logging.DEBUG: grey + base_style + reset,  # type: ignore
+        logging.INFO: white + base_style + reset,  # type: ignore
+        logging.WARNING: yellow + base_style + reset,  # type: ignore
+        logging.ERROR: red + base_style + reset,  # type: ignore
+        logging.CRITICAL: bold_red + base_style + reset,  # type: ignore
     }
 
     def format(self, record):

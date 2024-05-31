@@ -1,3 +1,4 @@
+# type: ignore
 """Source: https://medium.com/@newhardwarefound/qlora-with-llama-2-ca1b4bcf26f0"""
 
 import copy
@@ -22,13 +23,13 @@ class DataCollatorForCausalLM(object):
     def __call__(
         self,
         instances: dict[str, Sequence[str]] | Sequence[dict[str, str]],
-        device: torch.device = None,
+        device: torch.device | None = None,
     ) -> dict[str, torch.Tensor]:
         assert (
             self.tokenizer.pad_token_id is not None
         ), "The tokenizer must have a pad token set"
 
-        if not isinstance(instances, list):
+        if isinstance(instances, dict):
             if isinstance(instances["input"], str):
                 instances = [instances]
             else:

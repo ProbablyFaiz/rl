@@ -13,7 +13,7 @@ from rl.utils import LOGGER
 class LLMConfig:
     model_name_or_path: str
     tokenizer_name_or_path: str = ""
-    lora_name_or_path: str = None
+    lora_name_or_path: str | None = None
     context_window_tokens: int = None
     max_new_tokens: int = 2048
     temperature: float = 0.0
@@ -22,6 +22,8 @@ class LLMConfig:
     visible_devices: str | None = None
 
     def __post_init__(self):
+        if not self.tokenizer_name_or_path:
+            self.tokenizer_name_or_path = self.model_name_or_path
         if model_override := rl.utils.io.getenv("MODEL_OVERRIDE"):
             LOGGER.warning(
                 f"Using model override: {model_override}. This will override the model name or path provided."
@@ -62,7 +64,7 @@ class QuantizationType(str, Enum):
     FULL = "full"
 
 
-def get_quantization_config(quant_type: str = None) -> BitsAndBytesConfig | None:
+def get_quantization_config(quant_type: str | None = None) -> BitsAndBytesConfig | None:
     quant_config = rl.utils.io.getenv("QUANT", default="").lower() or quant_type
     if quant_config == QuantizationType.FOUR_BIT:
         return BitsAndBytesConfig(

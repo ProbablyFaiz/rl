@@ -11,8 +11,7 @@ def _parse_int(s: str) -> tuple[str, str]:
 
 
 def _parse_brackets(s: str) -> tuple[list[str], str]:
-    # parse a "bracket" expression (including closing ']')
-    lst = []
+    lst: list[str] = []
     while len(s) > 0:
         if s[0] == ",":
             s = s[1:]
@@ -44,6 +43,7 @@ def _parse_brackets(s: str) -> tuple[list[str], str]:
             else:
                 lst.extend([str(x) for x in range(int(a), int(b) + 1)])
     assert len(s) > 0, "Missing closing ']'"
+    return lst, s[1:]
 
 
 def _parse_node(s: str) -> tuple[list[str], str]:

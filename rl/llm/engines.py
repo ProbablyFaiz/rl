@@ -8,12 +8,13 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncGenerator, Iterator, Union
+from typing import Any, AsyncGenerator, Coroutine, Iterator, Union, cast
 
 import huggingface_hub
 import openai
 import torch
 import tqdm.asyncio
+from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from transformers import AutoTokenizer
 
@@ -30,10 +31,10 @@ if (
         AsyncLLMEngine,
         EngineArgs,
         LLMEngine,
+        RequestOutput,
         SamplingParams,
     )
     from vllm.lora.request import LoRARequest
-
 
 InferenceInput = Union[str, ChatCompletionMessageParam]
 
@@ -43,6 +44,12 @@ class InferenceOutput:
     prompt: InferenceInput
     text: str
     metadata: dict[str, Any]  # For now, not used for anything
+
+
+def _apply_chat_template(tokenizer, messages):
+    return tokenizer.apply_chat_template(
+        messages, add_generation_prompt=True, tokenize=False
+    )
 
 
 class InferenceEngine(ABC):
@@ -58,15 +65,6 @@ class InferenceEngine(ABC):
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
-
-    def apply_chat_template(self, messages):
-        if not hasattr(self, tokenizer):
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.llm_config.tokenizer_name_or_path
-            )
-        return self.tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, tokenize=False
-        )
 
     @abstractmethod
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
@@ -116,16 +114,17 @@ class ClientEngine(ABC):
         Returns:
             The generated text (not including the prompt).
         """
-        if isinstance(prompt, str):
+        if not isinstance(prompt, list):
             raise ValueError(
                 "ClientEngine requires a list of dicts, in the OpenAI API style."
             )
 
         response = self.client.chat.completions.create(
-            model=self.llm_config.model_name_or_path, messages=prompt
+            model=self.llm_config.model_name_or_path,
+            messages=prompt,
         )
         return InferenceOutput(
-            prompt=prompt,
+            prompt=prompt,  # type: ignore
             text=response.choices[0].message.content,
             metadata={
                 "model": self.llm_config.model_name_or_path,
@@ -149,15 +148,16 @@ class AsyncInferenceEngine:
         self.llm_config = llm_config
 
     async def __aenter__(self):
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.llm_config.tokenizer_name_or_path
+        )
         pass
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         pass
 
     @abstractmethod
-    async def stream(
-        self, prompt: str
-    ) -> InferenceOutput | AsyncGenerator[InferenceOutput, bool]:
+    async def stream(self, prompt: str) -> AsyncGenerator[InferenceOutput, bool]:
         """Given the input prompt, returns an async generator that yields InferenceOutput objects
         and can be sent an `abort` boolean via .asend(True) to stop the generation.
 
@@ -179,9 +179,9 @@ class AsyncInferenceEngine:
             The generated text (not including the prompt).
         """
         if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
+            prompt = _apply_chat_template(self.tokenizer, prompt)
         res = None
-        async for res in self.stream(prompt):
+        async for res in self.stream(prompt):  # type: ignore
             pass
         return res
 
@@ -294,18 +294,24 @@ class VLLMEngine(InferenceEngine):
         self.vllm, self.generate_kwargs = _get_vllm_engine(
             self.llm_config, use_async=False
         )
+        self.tokenizer = self.vllm.get_tokenizer()
 
     def __exit__(self, exc_type, exc_value, traceback):
         del self.vllm
 
-    def generate(self, prompt: str) -> InferenceOutput:
+    def generate(self, prompt: InferenceInput) -> InferenceOutput:
         if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
+            prompt = self.tokenizer.apply_chat_template(prompt)
         return self.batch_generate([prompt])[0]
 
     def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
-        prompts = [
-            prompt if isinstance(prompt, str) else self.apply_chat_template(prompt)
+        prompts: list[str] = [
+            (
+                prompt
+                if isinstance(prompt, str)
+                else _apply_chat_template(self.tokenizer, prompt)
+            )
+            for prompt in prompts
         ]
         vllm_outputs = self._get_vllm_outputs(prompts)
 
@@ -321,7 +327,7 @@ class VLLMEngine(InferenceEngine):
         return inference_outputs
 
     def _get_vllm_outputs(self, prompts: list[str]):
-        vllm_outputs = []
+        vllm_outputs: list[tuple[str, RequestOutput]] = []
         curr_uuid = str(uuid.uuid4())
         for i, prompt in enumerate(prompts):
             self.vllm.add_request(
@@ -341,7 +347,9 @@ class VLLMEngine(InferenceEngine):
                 if req_output.finished and req_output.request_id.startswith(curr_uuid):
                     if pbar is not None:
                         pbar.update(1)
-                    vllm_outputs.append((req_output.request_id, req_output))
+                    vllm_outputs.append(
+                        (req_output.request_id, cast(RequestOutput, req_output))
+                    )
 
         vllm_outputs.sort(key=lambda x: int(x[0].split("_", 1)[1]))
         return [output[1] for output in vllm_outputs]
@@ -391,6 +399,9 @@ class WorkerVLLMEngine(InferenceEngine):
             stderr=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
         )
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.llm_config.tokenizer_name_or_path
+        )
 
         client_kwargs = {
             "base_url": f"http://localhost:{port}/v1",
@@ -414,11 +425,14 @@ class WorkerVLLMEngine(InferenceEngine):
         self.server.wait()
 
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
-        if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
+        formatted_prompt: str = (
+            prompt
+            if isinstance(prompt, str)
+            else _apply_chat_template(self.tokenizer, prompt)
+        )
         res = self.client.completions.create(
             model=self.llm_config.model_name_or_path,
-            prompt=prompt,
+            prompt=formatted_prompt,
             max_tokens=self.llm_config.max_new_tokens,
             temperature=self.llm_config.temperature,
             frequency_penalty=self.llm_config.frequency_penalty,
@@ -426,11 +440,14 @@ class WorkerVLLMEngine(InferenceEngine):
         return self._wrap_output(prompt, res.choices[0].text)
 
     def stream(self, prompt: InferenceInput) -> Iterator[InferenceOutput]:
-        if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
+        formatted_prompt: str = (
+            prompt
+            if isinstance(prompt, str)
+            else _apply_chat_template(self.tokenizer, prompt)
+        )
         completion = self.client.completions.create(
             model=self.llm_config.model_name_or_path,
-            prompt=prompt,
+            prompt=formatted_prompt,
             max_tokens=self.llm_config.max_new_tokens,
             temperature=self.llm_config.temperature,
             frequency_penalty=self.llm_config.frequency_penalty,
@@ -469,18 +486,22 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
         self.vllm, self.generate_kwargs = _get_vllm_engine(
             self.llm_config, use_async=True
         )
+        self.tokenizer = await self.vllm.get_tokenizer()
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         del self.vllm
 
     async def stream(
         self, prompt: InferenceInput
-    ) -> AsyncGenerator[InferenceOutput, bool]:
-        if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
+    ) -> AsyncGenerator[InferenceOutput, bool]:  # type: ignore
+        formatted_prompt: str = (
+            prompt
+            if isinstance(prompt, str)
+            else _apply_chat_template(self.tokenizer, prompt)
+        )
         curr_uuid = str(uuid.uuid4())
         result_generator = self.vllm.generate(
-            prompt,
+            formatted_prompt,
             **self.generate_kwargs,
             request_id=curr_uuid,
         )
@@ -492,10 +513,11 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
                 break
 
     async def generate(self, prompt: InferenceInput) -> InferenceOutput:
-        if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
+        if isinstance(prompt, list):
+            tokenizer = await self.vllm.get_tokenizer()
+            prompt = tokenizer.apply_chat_template(prompt)
         res = None
-        async for res in self.stream(prompt):
+        async for res in self.stream(prompt):  # type: ignore
             pass
         return res
 
@@ -510,52 +532,8 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
         )
 
 
-class LlamaCppEngine(InferenceEngine):
-    NAME = "llama.cpp"
-
-    model: "Llama"
-
-    def __init__(self, llm_config: LLMConfig):
-        super().__init__(llm_config)
-
-    def __enter__(self):
-        model_path = rl.utils.llm.find_llama_cpp_model(
-            self.llm_config.model_name_or_path
-        )
-
-        from llama_cpp import Llama
-
-        self.model = Llama(
-            model_path,
-            n_ctx=self.llm_config.context_window_tokens,
-        )
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        del self.model
-
-    def generate(self, prompt: InferenceInput) -> InferenceOutput:
-        if not isinstance(prompt, str):
-            prompt = self.apply_chat_template(prompt)
-        res = self.model(prompt, max_tokens=self.llm_config.max_new_tokens)
-        return InferenceOutput(
-            prompt=prompt, text=res["choices"][0]["text"], metadata={}
-        )
-
-
-ENGINES = {
-    e.NAME: e
-    for e in (
-        VLLMEngine,
-        LlamaCppEngine,
-    )
-}
+ENGINES = {e.NAME: e for e in (VLLMEngine,)}
 
 
 def get_inference_engine_cls(*, default: str = "vllm") -> type[InferenceEngine]:
-    if rl.utils.io.getenv("INFERENCE_BACKEND", "") == "cpu":
-        LOGGER.warning(
-            "INFERENCE_BACKEND=cpu is set, using LlamaCppEngine for inference."
-        )
-        return LlamaCppEngine
     return ENGINES[default]

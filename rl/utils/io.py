@@ -141,7 +141,14 @@ def write_csv(
         filename = Path(filename)
     if filename.exists() and not overwrite:
         raise ValueError(f"{filename} already exists and overwrite is not set.")
+    kwargs = (
+        {
+            "fieldnames": field_names,
+        }
+        if field_names
+        else {}
+    )
     with open(filename, "w") as f:
-        writer = csv.DictWriter(f, fieldnames=field_names)
+        writer = csv.DictWriter(f, **kwargs)  # type: ignore
         writer.writeheader()
         writer.writerows(records)

@@ -1,3 +1,4 @@
+# type: ignore
 """A script to train an LLM with LoRA."""
 
 import hashlib
@@ -215,7 +216,7 @@ def main(
     del trainer, tokenizer, model
     if merge_after:
         merged_dir = _DEFAULT_MERGED_DIR / (name or output_dir.name)
-        rl.training.merge_lora.merge_lora.callback(
+        rl.llm.merge_lora.merge_lora.callback(
             base_model_id=base_model_id,
             lora_model_id=output_dir,
             output_path=merged_dir,
@@ -304,7 +305,7 @@ def get_model(
         attn_implementation="flash_attention_2",
     )
     model = peft.prepare_model_for_kbit_training(model)
-    model = peft.get_peft_model(model, peft.LoraConfig(**LORA_CONFIG))
+    model = peft.get_peft_model(model, peft.LoraConfig(**LORA_CONFIG))  # type: ignore
     model.config.use_cache = False
     torch.compile(model)
     return model, get_tokenizer(base_model_id)

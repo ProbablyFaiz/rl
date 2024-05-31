@@ -8,10 +8,10 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, cast
 
 import click
-import pexpect
+import pexpect  # type: ignore
 import questionary
 import regex
 import rich
@@ -489,8 +489,8 @@ def ssh(node: str):
 @_requires_duo
 @_requires_sherlock_credentials
 def _ssh_into_sherlock(node: str):
-    credentials = _read_credentials()
-    duo = Duo.from_config(_read_duo())
+    credentials = cast(dict[str, str], _read_credentials())
+    duo = Duo.from_config(cast(DuoConfig, _read_duo()))
 
     node = node or credentials["node"]
     node_url = f"{node}.sherlock.stanford.edu"
@@ -546,7 +546,7 @@ def _select_node() -> str:
 @_requires_duo
 @_requires_sherlock_credentials
 def scp(direction: str, source: str, destination: str, scp_options: list[str]):
-    credentials = _read_credentials()
+    credentials = cast(dict[str, str], _read_credentials())
     duo = Duo.from_config(_read_duo())
 
     node = credentials["node"]
@@ -566,7 +566,7 @@ _MFA_LINE_REGEX = regex.compile(
 )
 
 
-def _run_sherlock_ssh(ssh_command: str, credentials: dict, duo: Duo) -> None:
+def _run_sherlock_ssh(ssh_command: str, credentials: dict[str, str], duo: Duo):
     ssh = pexpect.spawn(ssh_command)
     ssh.expect("password:")
     ssh.sendline(credentials["password"])
@@ -673,7 +673,7 @@ def _write_credentials(credentials):
         json.dump(credentials, f, indent=2)
 
 
-def _read_credentials() -> dict | None:
+def _read_credentials() -> dict[str, str] | None:
     if not CREDENTIALS_FILE.exists():
         return None
     with open(CREDENTIALS_FILE, "r") as f:

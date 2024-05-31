@@ -31,8 +31,8 @@ from tqdm import tqdm
 
 from rl.utils import io
 
-PlotMethod = Callable[None, Figure]
-TableMethod = Callable[None, DataFrame]
+PlotMethod = Callable[..., Figure]
+TableMethod = Callable[..., DataFrame]
 
 plot_methods: List[PlotMethod] = []
 table_methods: List[TableMethod] = []

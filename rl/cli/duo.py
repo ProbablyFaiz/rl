@@ -13,6 +13,7 @@ from typing import TypedDict
 import requests
 from Crypto.Hash import SHA512
 from Crypto.PublicKey import RSA
+from Crypto.PublicKey.RSA import RsaKey
 from Crypto.Signature import pkcs1_15
 from strenum import StrEnum
 
@@ -53,7 +54,7 @@ class Duo:
     pkey: str
     hotp_secret: str
     hotp_counter: int
-    key: RSA
+    key: RsaKey
 
     @classmethod
     def from_qr_url(cls, qr_url: str) -> "Duo":
