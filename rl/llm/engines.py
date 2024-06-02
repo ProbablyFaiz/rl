@@ -134,9 +134,15 @@ class ClientEngine(ABC):
 
 
 class TogetherEngine(ClientEngine):
-    NAME = "together-engine"
+    NAME = "together"
     BASE_URL = "https://api.together.xyz/v1"
     API_KEY_NAME = "TOGETHER_API_KEY"
+
+
+class OpenAIEngine(ClientEngine):
+    NAME = "openai"
+    BASE_URL = "https://api.openai.com/v1"
+    API_KEY_NAME = "OPENAI_API_KEY"
 
 
 class AsyncInferenceEngine:
