@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, Union, cast
 
+import click
 import huggingface_hub
 import openai
 import torch
@@ -543,5 +544,67 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
 ENGINES = {e.NAME: e for e in (VLLMEngine,)}
 
 
-def get_inference_engine_cls(*, default: str = "vllm") -> type[InferenceEngine]:
-    return ENGINES[default]
+def get_inference_engine_cls(engine_name: str = "vllm") -> type[InferenceEngine]:
+    return ENGINES[engine_name]
+
+
+# A decorator which injects engine configuration click options, reads them, then constructs the engine
+#  and passes it to the decorated function.
+def inject_llm_engine(defaults: dict[str, Any] | None):
+    def decorator(func):
+        @click.option(
+            "--engine-name",
+            "-e",
+            default=defaults.get("engine_name", "vllm"),
+            show_default=True,
+            help="The name of the engine to use.",
+        )
+        @click.option(
+            "--model-name-or-path",
+            "-m",
+            required=defaults.get("model_name_or_path") is None,
+            default=defaults.get("model_name_or_path"),
+            show_default=True,
+            help="The model name or path to use for the engine.",
+        )
+        @click.option(
+            "--tokenizer-name-or-path",
+            default=defaults.get("tokenizer_name_or_path")
+            or defaults.get("model_name_or_path"),
+            show_default=defaults.get("tokenizer_name_or_path"),
+            help="The tokenizer name or path to use for the engine, if different from model.",
+        )
+        @click.option(
+            "--context-window",
+            type=int,
+            default=defaults.get("context_window_tokens", 8192),
+            help="The number of tokens in the context window.",
+        )
+        @click.option(
+            "--max-new-tokens",
+            type=int,
+            default=defaults.get("max_new_tokens", 1024),
+            help="The maximum number of new tokens to generate.",
+        )
+        @click.option(
+            "--temperature",
+            type=float,
+            default=defaults.get("temperature", 0.3),
+            help="The temperature to use for sampling.",
+        )
+        def wrapper(*args, **kwargs):
+            llm_config_kwargs = {
+                key: kwargs.pop(key)
+                for key in (
+                    "model_name_or_path",
+                    "tokenizer_name_or_path",
+                    "context_window",
+                    "max_new_tokens",
+                    "temperature",
+                )
+            }
+            llm_config = LLMConfig(**llm_config_kwargs)
+            engine = get_inference_engine_cls(kwargs.pop("engine_name"))(llm_config)
+            return func(*args, engine=engine, **kwargs)
+
+        return wrapper
