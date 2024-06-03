@@ -608,3 +608,5 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
             return func(*args, engine=engine, **kwargs)
 
         return wrapper
+
+    return decorator
