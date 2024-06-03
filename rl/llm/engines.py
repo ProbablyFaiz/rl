@@ -576,6 +576,7 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
         )
         @click.option(
             "--context-window",
+            "context_window_tokens",
             type=int,
             default=defaults.get("context_window_tokens", 8192),
             help="The number of tokens in the context window.",
@@ -598,7 +599,7 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
                 for key in (
                     "model_name_or_path",
                     "tokenizer_name_or_path",
-                    "context_window",
+                    "context_window_tokens",
                     "max_new_tokens",
                     "temperature",
                 )
