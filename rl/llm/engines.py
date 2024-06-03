@@ -16,6 +16,7 @@ import openai
 import torch
 import tqdm.asyncio
 from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.chat import ChatCompletionMessageParam
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
@@ -91,7 +92,7 @@ class InferenceEngine(ABC):
         return [self.generate(prompt) for prompt in prompts]
 
 
-class ClientEngine(ABC):
+class ClientEngine(InferenceEngine, ABC):
     NAME: str
     BASE_URL: str
     API_KEY_NAME: str
@@ -100,6 +101,22 @@ class ClientEngine(ABC):
     def __init__(self, llm_config: LLMConfig):
         rl.utils.io.ensure_dotenv_loaded()
         self.llm_config = llm_config
+
+    @abstractmethod
+    def generate(
+        self, prompt: openai.types.chat.ChatCompletionMessageParam
+    ) -> InferenceOutput:
+        pass
+
+
+class OpenAIClientEngine(InferenceEngine, ABC):
+    NAME: str
+    BASE_URL: str
+    API_KEY_NAME: str
+    llm_config: LLMConfig
+
+    def __init__(self, llm_config: LLMConfig):
+        super().__init__(llm_config)
         self.client = openai.OpenAI(
             api_key=rl.utils.io.getenv(self.API_KEY_NAME), base_url=self.BASE_URL
         )
@@ -134,16 +151,64 @@ class ClientEngine(ABC):
         )
 
 
-class TogetherEngine(ClientEngine):
+class TogetherEngine(OpenAIClientEngine):
     NAME = "together"
     BASE_URL = "https://api.together.xyz/v1"
     API_KEY_NAME = "TOGETHER_API_KEY"
 
 
-class OpenAIEngine(ClientEngine):
+class OpenAIEngine(OpenAIClientEngine):
     NAME = "openai"
     BASE_URL = "https://api.openai.com/v1"
     API_KEY_NAME = "OPENAI_API_KEY"
+
+
+class AnthropicEngine(ClientEngine):
+    NAME = "anthropic"
+    BASE_URL = "https://api.anthropic.com/v1"
+    API_KEY_NAME = "ANTHROPIC_API_KEY"
+
+    def __init__(self, llm_config: LLMConfig):
+        super().__init__(llm_config)
+        self.client = Anthropic(api_key=rl.utils.io.getenv(self.API_KEY_NAME))
+
+    def generate(
+        self,
+        prompt: openai.types.chat.ChatCompletionMessageParam,
+        max_tokens: int = 1024,
+    ) -> InferenceOutput:
+        """Given the input prompt, returns the generated text.
+
+        Args:
+            prompt: The input prompt.
+
+        Returns:
+            The generated text (not including the prompt).
+        """
+        if not isinstance(prompt, list):
+            raise ValueError(
+                "ClientEngine requires a list of dicts, in the OpenAI API style."
+            )
+
+        system_prompt = None
+        if prompt[0]["role"] == "system":
+            system_prompt = prompt[0]["content"]
+            prompt = prompt[1:]
+
+        message = self.client.messages.create(
+            model=self.llm_config.model_name_or_path,
+            messages=prompt,
+            system=system_prompt,
+            max_tokens=max_tokens,
+        )
+        return InferenceOutput(
+            prompt=prompt,  # type: ignore
+            text=message.content[0].text,
+            metadata={
+                "model": self.llm_config.model_name_or_path,
+                "base_url": self.BASE_URL,
+            },
+        )
 
 
 class AsyncInferenceEngine:

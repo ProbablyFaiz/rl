@@ -32,6 +32,7 @@ dependencies = [
     "torch",
     "pyspark",
     "unidecode",
+    "anthropic",
 ]
 
 [project.optional-dependencies]
