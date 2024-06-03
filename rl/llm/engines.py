@@ -541,7 +541,15 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
         )
 
 
-ENGINES = {e.NAME: e for e in (VLLMEngine,)}
+ENGINES = {
+    e.NAME: e
+    for e in (
+        VLLMEngine,
+        WorkerVLLMEngine,
+        OpenAIEngine,
+        TogetherEngine,
+    )
+}
 
 
 def get_inference_engine_cls(engine_name: str = "vllm") -> type[InferenceEngine]:
