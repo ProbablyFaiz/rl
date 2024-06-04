@@ -33,14 +33,14 @@ dependencies = [
     "pyspark",
     "unidecode",
     "anthropic",
+    "transformers",
+    "openai",
 ]
 
 [project.optional-dependencies]
 llm = [
     "vllm>=0.4.0; platform_system == 'Linux'",
     "flash-attn; platform_system == 'Linux'",
-    "openai",
-    "transformers",
     "peft",
     "trl",
     "datasets",
