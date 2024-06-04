@@ -92,6 +92,55 @@ class InferenceEngine(ABC):
         return [self.generate(prompt) for prompt in prompts]
 
 
+class ManualEditEngine(InferenceEngine):
+    NAME = "human input"
+
+    def __init__(
+        self, llm_config: LLMConfig | None = None, response_template: str = ""
+    ):
+        super().__init__(llm_config)
+        self.response_template = response_template
+
+    def generate(self, prompt: InferenceInput) -> InferenceOutput:
+        """Open a temp file, and put the prompt in there. Then open the file in EDITOR, and wait for the user to write the response. make any necessary imports in the mehtod"""
+        import sys, tempfile, os
+        import datetime
+        from subprocess import call
+
+        EDITOR = os.environ.get("EDITOR", "vim")
+
+        if not isinstance(prompt, str):
+            prompt = _apply_chat_template(self.tokenizer, prompt)
+
+        with tempfile.NamedTemporaryFile(suffix=".tmp") as tf:
+            tf.write(prompt.encode())
+            if self.response_template:
+                tf.write(
+                    f"\n### response template begins now, delete this line ###\n{self.response_template}".encode()
+                )
+            tf.flush()
+            call([EDITOR, tf.name])
+            tf.seek(0)
+            edited_message = tf.read().decode()
+        if not edited_message.startswith(prompt):
+            raise ValueError(
+                "The prompt has been modified. Please do not modify the prompt."
+            )
+        response = edited_message[len(prompt) :].strip()
+        if not response:
+            raise ValueError("The response is empty or unsaved.")
+        if "### response template begins now, delete this line ###" in response:
+            raise ValueError("The response template marker has not been deleted.")
+        return InferenceOutput(
+            prompt=prompt,
+            text=response,
+            metadata={
+                "model": "manual edit",
+                "created_at": datetime.datetime.now().isoformat(),
+            },
+        )
+
+
 class ClientEngine(InferenceEngine, ABC):
     NAME: str
     BASE_URL: str
@@ -214,7 +263,7 @@ class AnthropicEngine(ClientEngine):
 class AsyncInferenceEngine:
     NAME: str
     llm_config: LLMConfig
-    tokenizer: PreTrainedTokenizer
+    tokenizer: "PreTrainedTokenizer"
 
     def __init__(self, llm_config: LLMConfig):
         rl.utils.io.ensure_dotenv_loaded()
