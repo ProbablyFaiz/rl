@@ -3,6 +3,7 @@ the OCR text of the image. Because the LLM sometimes outputs a passage
 that slightly differs from the OCR text, we need to fuzzy match the
 passage to find the character span of the passage in the OCR text.
 """
+
 import dataclasses
 import difflib
 import re

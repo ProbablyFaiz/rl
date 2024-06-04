@@ -22,7 +22,7 @@ This module provides a decorator-based interface for creating figures and tables
 
 import glob
 import os
-from typing import Callable, Dict, List
+from typing import Callable, List
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure

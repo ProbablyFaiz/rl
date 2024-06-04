@@ -53,8 +53,8 @@ class LLMConfig:
                 )
             except OSError:
                 LOGGER.warning(
-                    f"No context window size provided, and it could not be inferred. "
-                    f"Setting context_window_tokens to None; this may cause downstream errors."
+                    "No context window size provided, and it could not be inferred. "
+                    "Setting context_window_tokens to None; this may cause downstream errors."
                 )
 
 

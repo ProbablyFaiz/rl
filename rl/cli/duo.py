@@ -89,7 +89,7 @@ class Duo:
     def answer_latest_transaction(self, approve: bool) -> dict:
         transactions = self.get_transactions()
         if not transactions:
-            raise DuoError(f"No transactions found.")
+            raise DuoError("No transactions found.")
         return self.answer_transaction(transactions[0].id, approve)
 
     def get_transactions(self) -> list[Transaction]:

@@ -51,7 +51,7 @@ def merge_lora(base_model_id: str, lora_model_id: str, output_path: Path):
     try:
         # In case there's a modified tokenizer associated with the LoRA training.
         tokenizer = AutoTokenizer.from_pretrained(lora_model_id)
-    except:
+    except Exception:
         rl.utils.LOGGER.warning(
             f"Couldn't find a tokenizer at {lora_model_id}. Using tokenizer from base model {base_model_id}."
         )

@@ -1,7 +1,6 @@
 import pyspark
 
 import rl.utils.io
-from rl.utils import LOGGER
 
 
 def get_spark_session() -> pyspark.sql.SparkSession:
