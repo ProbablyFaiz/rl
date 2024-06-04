@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, Union, cast
+import textwrap as tw
 
 import click
 import huggingface_hub
@@ -101,7 +102,7 @@ class ManualEditEngine(InferenceEngine):
         super().__init__(llm_config)
         self.response_template = response_template
 
-    def generate(self, prompt: InferenceInput) -> InferenceOutput:
+    def generate(self, prompt: InferenceInput, wrap_prompt: bool=True) -> InferenceOutput:
         """Open a temp file, and put the prompt in there. Then open the file in EDITOR, and wait for the user to write the response. make any necessary imports in the mehtod"""
         import sys, tempfile, os
         import datetime
@@ -110,7 +111,14 @@ class ManualEditEngine(InferenceEngine):
         EDITOR = os.environ.get("EDITOR", "vim")
 
         if not isinstance(prompt, str):
+            if not hasattr(self, "tokenizer"):
+                model = "meta-llama/Meta-Llama-3-8B"
+                if self.llm_config:
+                    model = self.llm_config.model_name_or_path
+                self.tokenizer = AutoTokenizer.from_pretrained(model)
             prompt = _apply_chat_template(self.tokenizer, prompt)
+
+        prompt = tw.fill(prompt, width=80, replace_whitespace=False) if wrap_prompt else prompt
 
         with tempfile.NamedTemporaryFile(suffix=".tmp") as tf:
             tf.write(prompt.encode())
