@@ -1,4 +1,3 @@
-import more_itertools as mit
 from transformers import PreTrainedTokenizerFast
 
 
@@ -15,6 +14,7 @@ def token_chunk(
 
     tokens = tokenizer.tokenize(text)
     chunks = []
-    for chunk in mit.windowed(tokens, n=chunk_size, step=stride):
+    for i in range(0, len(tokens), stride):
+        chunk = tokens[i : i + chunk_size]
         chunks.append(tokenizer.convert_tokens_to_string(list(chunk)))
     return chunks
