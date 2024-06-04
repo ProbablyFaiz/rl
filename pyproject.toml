@@ -79,4 +79,5 @@ skip_gitignore = true
 disable_error_code = ["import", "override"]
 
 [tool.ruff.lint]
+extend-select = ["I"]
 extend-ignore = ["F401"]
