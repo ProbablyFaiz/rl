@@ -1,5 +1,5 @@
 import more_itertools as mit
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizerFast
 
 
 def token_chunk(
@@ -7,7 +7,7 @@ def token_chunk(
     *,
     chunk_size: int,
     stride: int | None = None,
-    tokenizer: PreTrainedTokenizer,
+    tokenizer: PreTrainedTokenizerFast,
 ) -> list[str]:
     """Tokenize a long text into chunks of a specified number of tokens."""
     if stride is None:
