@@ -102,9 +102,13 @@ class ManualEditEngine(InferenceEngine):
         super().__init__(llm_config)
         self.response_template = response_template
 
-    def generate(self, prompt: InferenceInput, wrap_prompt: bool=True) -> InferenceOutput:
+    def generate(
+        self, prompt: InferenceInput, wrap_prompt: bool = True
+    ) -> InferenceOutput:
         """Open a temp file, and put the prompt in there. Then open the file in EDITOR, and wait for the user to write the response. make any necessary imports in the mehtod"""
-        import sys, tempfile, os
+        import sys
+        import tempfile
+        import os
         import datetime
         from subprocess import call
 
@@ -118,7 +122,11 @@ class ManualEditEngine(InferenceEngine):
                 self.tokenizer = AutoTokenizer.from_pretrained(model)
             prompt = _apply_chat_template(self.tokenizer, prompt)
 
-        prompt = tw.fill(prompt, width=80, replace_whitespace=False) if wrap_prompt else prompt
+        prompt = (
+            tw.fill(prompt, width=80, replace_whitespace=False)
+            if wrap_prompt
+            else prompt
+        )
 
         with tempfile.NamedTemporaryFile(suffix=".tmp") as tf:
             tf.write(prompt.encode())
