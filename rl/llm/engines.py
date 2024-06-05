@@ -803,6 +803,12 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
             default=defaults.get("temperature", 0.3),
             help="The temperature to use for sampling.",
         )
+        @click.option(
+            "--num-gpus",
+            type=int,
+            default=defaults.get("num_gpus", 1),
+            help="The number of GPUs to use for inference.",
+        )
         def wrapper(*args, **kwargs):
             llm_config_kwargs = {
                 key: kwargs.pop(key)
@@ -812,6 +818,7 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
                     "context_window_tokens",
                     "max_new_tokens",
                     "temperature",
+                    "num_gpus",
                 )
             }
             llm_config = LLMConfig(**llm_config_kwargs)
