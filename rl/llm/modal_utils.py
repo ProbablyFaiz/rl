@@ -51,14 +51,9 @@ def install_rl(revision: str = "main"):
 
 
 def download_model_to_image(model_dir, model_name):
-    from huggingface_hub import snapshot_download
-    from transformers.utils import move_cache
+    from transformers import AutoModel
 
     Path(model_dir).mkdir(parents=True, exist_ok=True)
 
-    snapshot_download(
-        model_name,
-        local_dir=model_dir,
-        ignore_patterns=["*.pt", "*.bin", "*.pth"],  # Using safetensors
-    )
-    move_cache()
+    model = AutoModel.from_pretrained(model_name)
+    model.save_pretrained(model_dir)

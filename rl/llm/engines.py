@@ -14,7 +14,6 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from subprocess import call
 from typing import Any, AsyncGenerator, Iterator, Union, cast
 
 import click
@@ -144,7 +143,7 @@ class ManualEditEngine(InferenceEngine):
             if self.response_template:
                 tf.write(f"\n{_RESPONSE_CANARY}\n{self.response_template}".encode())
             tf.flush()
-            call([self._EDITOR, tf.name])
+            subprocess.call([self._EDITOR, tf.name])
             tf.seek(0)
             edited_message = tf.read().decode()
         if not edited_message.startswith(prompt):
