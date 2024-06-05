@@ -18,7 +18,7 @@ print(f"🚀 Deploying with config: {json.dumps(_DEPLOY_CONFIG, indent=2)}")
 
 
 def _derive_gpu_config(deploy_config):
-    return modal.gpu.A100(size="80GB", count=deploy_config.get("num_gpus", 1))
+    return modal.gpu.A100(size="80GB", count=deploy_config["llm_config"]["num_gpus"])
 
 
 def _get_vllm_image(deploy_config):
