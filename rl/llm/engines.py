@@ -289,9 +289,10 @@ class AnthropicEngine(ClientEngine):
         )
 
 
-class ModalEngine(OpenAIClientEngine):
+class ModalEngine(InferenceEngine):
     NAME = "modal"
     app_name: str
+    functions: dict[str, modal.Function]
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
@@ -323,6 +324,18 @@ class ModalEngine(OpenAIClientEngine):
                 check=True,
                 env=deploy_env,
             )
+        self.functions = {
+            "generate": modal.Function.lookup(self.app_name, "Model.generate"),
+            "batch_generate": modal.Function.lookup(
+                self.app_name, "Model.batch_generate"
+            ),
+        }
+
+    def generate(self, prompt: InferenceInput) -> InferenceOutput:
+        return self.functions["generate"].remote(prompt)
+
+    def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
+        return self.functions["batch_generate"].remote(prompts)
 
     def _get_modal_app_name(self):
         vllm_kwargs = _get_vllm_kwargs(self.llm_config)
@@ -496,8 +509,6 @@ class VLLMEngine(InferenceEngine):
         del self.vllm
 
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
-        if not isinstance(prompt, str):
-            prompt = self.tokenizer.apply_chat_template(prompt)
         return self.batch_generate([prompt])[0]
 
     def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
@@ -712,8 +723,7 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
 
     async def generate(self, prompt: InferenceInput) -> InferenceOutput:
         if isinstance(prompt, list):
-            tokenizer = await self.vllm.get_tokenizer()
-            prompt = tokenizer.apply_chat_template(prompt)
+            prompt = _apply_chat_template(self.tokenizer, prompt)
         res = None
         async for res in self.stream(prompt):  # type: ignore
             pass

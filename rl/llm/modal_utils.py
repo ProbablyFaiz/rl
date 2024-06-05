@@ -17,7 +17,7 @@ def get_deployed_id(app_name: str) -> str:
         (
             app["App ID"]
             for app in apps
-            if app["Description"] == app_name and app["State"] == "Deployed"
+            if app["Description"] == app_name and app["State"] == "deployed"
         ),
         None,
     )
