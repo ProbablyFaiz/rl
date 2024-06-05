@@ -438,7 +438,7 @@ def _get_vllm_engine(
             lora_path = lora_path.resolve()
 
     generate_kwargs: dict[str, Any] = {
-        "sampling_params": sampling_params,
+        "params": sampling_params,
     }
     if lora_path is not None:
         generate_kwargs["lora_request"] = LoRARequest(
