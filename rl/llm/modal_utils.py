@@ -39,11 +39,11 @@ def install_deps():
     subprocess.run([*_get_uv_install_prefix(), "hf-transfer", "huggingface-hub"])
 
 
-def install_rl():
+def install_rl(revision: str = "main"):
     subprocess.run(
         [
             *_get_uv_install_prefix(),
-            "rl[llm] @ git+https://github.com/ProbablyFaiz/rl.git@main",
+            f"rl[llm] @ git+https://github.com/ProbablyFaiz/rl.git@{revision}",
             "--no-build-isolation",
         ],
         check=True,
