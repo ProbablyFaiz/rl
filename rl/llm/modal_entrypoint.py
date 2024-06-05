@@ -108,7 +108,7 @@ async def main():
         "Who was Emperor Norton I, and what was his significance in San Francisco's history?",
     ]
     model = Model()
-    for question in questions:
-        print("Sending new request:", question, "\n\n")
-        print(model.generate.remote(question))
-        print("\n\n")
+    results = model.batch_generate.remote(questions)
+    print("\n".join([r.text for r in results]))
+    print("\n".join([r.text for r in results]))
+    print("\n".join([r.text for r in results]))
