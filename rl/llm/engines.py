@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import hashlib
 import json
@@ -306,9 +307,7 @@ class ModalEngine(OpenAIClientEngine):
             LOGGER.info(f"No deployed app found for {self.app_name}. Deploying...")
             deploy_config = {
                 "app_name": self.app_name,
-                "model_name_or_path": self.llm_config.model_name_or_path,
-                "num_gpus": self.llm_config.num_gpus,
-                "vllm_kwargs": _get_vllm_kwargs(self.llm_config),
+                "llm_config": dataclasses.asdict(self.llm_config),
             }
             deploy_env = {"MODAL_DEPLOY_CONFIG": json.dumps(deploy_config)}
             print(deploy_env)
@@ -343,13 +342,13 @@ class AsyncInferenceEngine:
         rl.utils.io.ensure_dotenv_loaded()
         self.llm_config = llm_config
 
-    async def __aenter__(self):
+    def __enter__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.llm_config.tokenizer_name_or_path
         )
         pass
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         pass
 
     @abstractmethod
@@ -529,7 +528,7 @@ class VLLMEngine(InferenceEngine):
         for i, prompt in enumerate(prompts):
             self.vllm.add_request(
                 request_id=str(f"{curr_uuid}_{i}"),
-                prompt=prompt,
+                inputs=prompt,
                 **self.generate_kwargs,
             )
 
@@ -679,13 +678,15 @@ class AsyncVLLMEngine(AsyncInferenceEngine):
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
 
-    async def __aenter__(self):
+    def __enter__(self):
         self.vllm, self.generate_kwargs = _get_vllm_engine(
             self.llm_config, use_async=True
         )
-        self.tokenizer = await self.vllm.get_tokenizer()
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.llm_config.tokenizer_name_or_path
+        )
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         del self.vllm
 
     async def stream(
@@ -736,6 +737,9 @@ ENGINES = {
         WorkerVLLMEngine,
         OpenAIEngine,
         TogetherEngine,
+        GroqEngine,
+        AnthropicEngine,
+        ModalEngine,
     )
 }
 

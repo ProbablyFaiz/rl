@@ -2,10 +2,11 @@ import json
 import os
 import subprocess
 import time
-from pathlib import Path
 
 import modal
 import modal.gpu
+
+import rl.llm.modal_utils
 
 _IMAGE_MODEL_DIR = "/model"
 _DEPLOY_CONFIG = json.loads(os.getenv("MODAL_DEPLOY_CONFIG", "{}"))
@@ -16,52 +17,30 @@ if not _DEPLOY_CONFIG:
 print(f"🚀 Deploying with config: {json.dumps(_DEPLOY_CONFIG, indent=2)}")
 
 
-def _download_model_to_image(model_dir, model_name):
-    from huggingface_hub import snapshot_download
-    from transformers.utils import move_cache
-
-    Path(model_dir).mkdir(parents=True, exist_ok=True)
-
-    snapshot_download(
-        model_name,
-        local_dir=model_dir,
-        ignore_patterns=["*.pt", "*.bin"],  # Using safetensors
-    )
-    move_cache()
-
-
 def _derive_gpu_config(deploy_config):
     return modal.gpu.A100(size="80GB", count=deploy_config.get("num_gpus", 1))
 
 
-def _install_deps():
-    return subprocess.run(
-        [
-            "uv",
-            "pip",
-            "install",
-            "rl[llm] @ git+https://github.com/ProbablyFaiz/rl.git@main",
-        ],
-        check=True,
-    )
-
-
 def _get_vllm_image(deploy_config):
     return (
-        modal.Image.debian_slim(python_version="3.11")
-        .pip_install(
-            "uv",
+        modal.Image.from_registry(
+            "nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.11"
         )
-        .run_function(_install_deps)
+        .apt_install("git")
+        .run_function(rl.llm.modal_utils.install_deps)
+        .run_function(rl.llm.modal_utils.install_rl)
         .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
         .run_function(
-            _download_model_to_image,
+            rl.llm.modal_utils.download_model_to_image,
             timeout=60 * 20,
             kwargs={
                 "model_dir": _IMAGE_MODEL_DIR,
-                "model_name": deploy_config["model_name_or_path"],
+                "model_name": deploy_config["llm_config"]["model_name_or_path"],
             },
             secrets=[modal.Secret.from_name("huggingface-token")],
+        )
+        .env(
+            {"MODAL_DEPLOY_CONFIG": json.dumps(deploy_config), "ENFORCE_EAGER": "true"}
         )
     )
 
@@ -73,6 +52,7 @@ app = modal.App(name=_DEPLOY_CONFIG["app_name"])
 
 
 @app.cls(
+    cpu=4.0,
     gpu=_GPU_CONFIG,
     timeout=60 * 10,
     container_idle_timeout=60 * 10,
@@ -81,70 +61,44 @@ app = modal.App(name=_DEPLOY_CONFIG["app_name"])
 )
 class Model:
     engine = None
+    config = None
 
     @modal.enter()
     def start_engine(self):
-        from vllm.engine.arg_utils import AsyncEngineArgs
-        from vllm.engine.async_llm_engine import AsyncLLMEngine
+        from rl.llm.config import LLMConfig
+        from rl.llm.engines import VLLMEngine
+
+        self.config = LLMConfig(**_DEPLOY_CONFIG["llm_config"])
+        self.config.model_name_or_path = _IMAGE_MODEL_DIR
+        self.config.tokenizer_name_or_path = _IMAGE_MODEL_DIR
 
         print("🥶 cold starting inference")
         start = time.monotonic_ns()
 
-        if "model" in _DEPLOY_CONFIG["vllm_kwargs"]:
-            del _DEPLOY_CONFIG["vllm_kwargs"]
-        engine_args = AsyncEngineArgs(
-            model=_IMAGE_MODEL_DIR,
-            **_DEPLOY_CONFIG["vllm_kwargs"],
-        )
-
-        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+        self.engine = VLLMEngine(self.config)
+        self.engine.__enter__()
         duration_s = (time.monotonic_ns() - start) / 1e9
         print(f"🏎️ engine started in {duration_s:.0f}s")
 
     @modal.method()
-    async def completion_stream(self, input_text: str):
-        from vllm import SamplingParams
-        from vllm.utils import random_uuid
+    def generate(self, inference_input):
+        return self.engine.generate(inference_input)
 
-        sampling_params = SamplingParams(
-            temperature=0.75,
-            max_tokens=128,
-            repetition_penalty=1.1,
-        )
-
-        request_id = random_uuid()
-        result_generator = self.engine.generate(
-            input_text,
-            sampling_params,
-            request_id,
-        )
-        index, num_tokens = 0, 0
-        start = time.monotonic_ns()
-        async for output in result_generator:
-            if output.outputs[0].text and "\ufffd" == output.outputs[0].text[-1]:
-                continue
-            text_delta = output.outputs[0].text[index:]
-            index = len(output.outputs[0].text)
-            num_tokens = len(output.outputs[0].token_ids)
-
-            yield text_delta
-        duration_s = (time.monotonic_ns() - start) / 1e9
-
-        yield (
-            f"\n\tGenerated {num_tokens} tokens in {duration_s:.1f}s,"
-            f" throughput = {num_tokens / duration_s:.0f} tokens/second on {_GPU_CONFIG}.\n"
-        )
+    @modal.method()
+    def batch_generate(self, inference_inputs):
+        return self.engine.batch_generate(inference_inputs)
 
     @modal.exit()
     def stop_engine(self):
-        if _DEPLOY_CONFIG["num_gpus"] > 1:
+        self.engine.__exit__(None, None, None)
+        if self.config.num_gpus > 1:
             import ray
 
             ray.shutdown()
 
 
 @app.local_entrypoint()
-def main():
+async def main():
     questions = [
         "Implement a Python function to compute the Fibonacci numbers.",
         "What is the fable involving a fox and grapes?",
@@ -156,5 +110,5 @@ def main():
     model = Model()
     for question in questions:
         print("Sending new request:", question, "\n\n")
-        for text in model.completion_stream.remote_gen(question):
-            print(text, end="", flush=text.endswith("\n"))
+        print(model.generate.remote(question))
+        print("\n\n")

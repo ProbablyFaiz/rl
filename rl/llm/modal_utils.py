@@ -1,12 +1,6 @@
 import json
 import subprocess
-import time
 from pathlib import Path
-
-import modal
-import modal.gpu
-
-from rl.llm.config import LLMConfig
 
 
 def get_deployed_id(app_name: str) -> str:
@@ -27,3 +21,44 @@ def get_deployed_id(app_name: str) -> str:
         ),
         None,
     )
+
+
+def _get_uv_install_prefix():
+    return ["python", "-m", "uv", "pip", "install", "--system", "--no-cache"]
+
+
+def install_deps():
+    subprocess.run(
+        ["python", "-m", "pip", "install", "uv"],
+        check=True,
+    )
+    subprocess.run(
+        [*_get_uv_install_prefix(), "packaging", "wheel", "torch", "psutil"],
+        check=True,
+    )
+    subprocess.run([*_get_uv_install_prefix(), "hf-transfer", "huggingface-hub"])
+
+
+def install_rl():
+    subprocess.run(
+        [
+            *_get_uv_install_prefix(),
+            "rl[llm] @ git+https://github.com/ProbablyFaiz/rl.git@main",
+            "--no-build-isolation",
+        ],
+        check=True,
+    )
+
+
+def download_model_to_image(model_dir, model_name):
+    from huggingface_hub import snapshot_download
+    from transformers.utils import move_cache
+
+    Path(model_dir).mkdir(parents=True, exist_ok=True)
+
+    snapshot_download(
+        model_name,
+        local_dir=model_dir,
+        ignore_patterns=["*.pt", "*.bin", "*.pth"],  # Using safetensors
+    )
+    move_cache()
