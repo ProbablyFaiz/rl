@@ -28,7 +28,7 @@ def _get_vllm_image(deploy_config):
         )
         .apt_install("git")
         .run_function(rl.llm.modal_utils.install_deps)
-        .run_function(rl.llm.modal_utils.install_rl, kwargs={"revision": "4b61c70"})
+        .run_function(rl.llm.modal_utils.install_rl, kwargs={"revision": "main"})
         .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
         .run_function(
             rl.llm.modal_utils.download_model_to_image,
