@@ -66,7 +66,9 @@ class Model:
     @modal.enter()
     def start_engine(self):
         from rl.llm.config import LLMConfig
-        from rl.llm.engines import VLLMEngine
+
+        # from rl.llm.engines import VLLMEngine
+        from rl.llm.engines import WorkerVLLMEngine as VLLMEngine
 
         self.config = LLMConfig(**_DEPLOY_CONFIG["llm_config"])
         self.config.model_name_or_path = _IMAGE_MODEL_DIR

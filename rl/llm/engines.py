@@ -451,7 +451,7 @@ def _get_vllm_engine(
             lora_path = lora_path.resolve()
 
     generate_kwargs: dict[str, Any] = {
-        "params": sampling_params,
+        "sampling_params": sampling_params,
     }
     if lora_path is not None:
         generate_kwargs["lora_request"] = LoRARequest(
@@ -539,7 +539,7 @@ class VLLMEngine(InferenceEngine):
         for i, prompt in enumerate(prompts):
             self.vllm.add_request(
                 request_id=str(f"{curr_uuid}_{i}"),
-                inputs=prompt,
+                prompt=prompt,
                 **self.generate_kwargs,
             )
 
