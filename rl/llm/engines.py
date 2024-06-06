@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -291,58 +292,41 @@ class AnthropicEngine(ClientEngine):
 class ModalEngine(InferenceEngine):
     NAME = "modal"
     app_name: str
-    functions: dict[str, modal.Function]
+    modal_call: modal.Function
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
-        self.app_name = self._get_modal_app_name()
+        self.app_name = self._get_modal_app_name(self.llm_config.model_name_or_path)
 
     def __enter__(self):
-        if self.llm_config.num_gpus is None:
-            LOGGER.warning(
-                "num_gpus is not set. Will deploy to Modal with 1 A100 80GB GPU."
-            )
-        deployed_id = rl.llm.modal_utils.get_deployed_id(self.app_name)
-        if deployed_id is None:
-            LOGGER.info(f"No deployed app found for {self.app_name}. Deploying...")
-            deploy_config = {
-                "app_name": self.app_name,
-                "llm_config": dataclasses.asdict(self.llm_config),
-            }
-            deploy_env = {"MODAL_DEPLOY_CONFIG": json.dumps(deploy_config)}
-            print(deploy_env)
-            entrypoint_path = str(Path(__file__).parent / "modal_entrypoint.py")
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "modal",
-                    "deploy",
-                    entrypoint_path,
-                ],
-                check=True,
-                env=deploy_env,
-            )
-        self.functions = {
-            "generate": modal.Function.lookup(self.app_name, "Model.generate"),
-            "batch_generate": modal.Function.lookup(
-                self.app_name, "Model.batch_generate"
-            ),
-        }
+        self.modal_call = modal.Function.lookup(self.app_name, "Model.call")
 
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
-        return self.functions["generate"].remote(prompt)
+        return self.batch_generate([prompt])[0]
 
     def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
-        return self.functions["batch_generate"].remote(prompts)
+        sampling_params = {
+            "max_tokens": self.llm_config.max_new_tokens,
+            "temperature": self.llm_config.temperature,
+            "frequency_penalty": self.llm_config.frequency_penalty,
+            "top_p": 1.0,
+        }
+        output_texts = self.modal_call.remote(
+            "batch_generate", prompts, sampling_params
+        )
+        return [
+            InferenceOutput(
+                prompt=prompt,
+                text=output_text,
+                metadata={
+                    "model_name_or_path": self.llm_config.model_name_or_path,
+                },
+            )
+            for prompt, output_text in zip(prompts, output_texts)
+        ]
 
-    def _get_modal_app_name(self):
-        vllm_kwargs = _get_vllm_kwargs(self.llm_config)
-        vllm_kwargs["enforce_eager"] = False
-        app_name = f"vllm_{self.llm_config.model_name_or_path}_"
-        # Add the hash of the kwargs to the app name
-        app_name += hashlib.md5(json.dumps(vllm_kwargs).encode()).hexdigest()[:16]
-        return app_name.replace("/", "_")
+    def _get_modal_app_name(self, model_name: str) -> str:
+        return "vllm_" + re.sub(r"[^a-zA-Z0-9-]", "_", model_name)
 
 
 class AsyncInferenceEngine:
