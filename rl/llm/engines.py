@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, Union, cast
 
 import click
+import google.generativeai as genai
 import huggingface_hub
 import modal
 import modal.runner
@@ -193,6 +194,7 @@ class OpenAIClientEngine(InferenceEngine, ABC):
         self.client = openai.Client(
             api_key=rl.utils.io.getenv(self.API_KEY_NAME), base_url=self.BASE_URL
         )
+        return self
 
     def generate(self, prompt: ChatInput) -> InferenceOutput:
         """Given the input prompt, returns the generated text.
@@ -238,6 +240,68 @@ class GroqEngine(OpenAIClientEngine):
     NAME = "groq"
     BASE_URL = "https://api.groq.com/openai/v1"
     API_KEY_NAME = "GROQ_API_KEY"
+
+
+class GeminiEngine(InferenceEngine):
+    NAME: str = "gemini"
+
+    def __init__(self, llm_config: LLMConfig):
+        super().__init__(llm_config)
+
+    def __enter__(self):
+        genai.configure(api_key=rl.utils.io.getenv("GEMINI_API_KEY"))
+
+    def generate(self, prompt: ChatInput) -> InferenceOutput:
+        if not isinstance(prompt, list):
+            raise ValueError(
+                "ClientEngine requires a list of dicts, in the Gemini API style."
+            )
+        system_message, prev_messages, last_message = self._convert_openai_to_gemini(
+            prompt
+        )
+        # One might reasonably ask, why not initialize the model in __enter__?
+        #  Well, I'll tell you: Google's moronic abstraction requires you to
+        #  pass the system instruction when *initializing* the model object,
+        #  because that makes sense.
+        model = genai.GenerativeModel(
+            model_name=self.llm_config.model_name_or_path,
+            generation_config={
+                "temperature": self.llm_config.temperature,
+                "max_output_tokens": self.llm_config.max_new_tokens,
+                "response_mime_type": "text/plain",
+            },
+            system_instruction=system_message,
+        )
+        chat_session = model.start_chat(
+            history=prev_messages,
+        )
+        # Can't include the last message in the history, because
+        #  that would make too much sense!
+        response = chat_session.send_message(last_message)
+
+        return InferenceOutput(
+            prompt=prompt,
+            text=response.text,
+            metadata={
+                "model": self.llm_config.model_name_or_path,
+            },
+        )
+
+    def _convert_openai_to_gemini(
+        self, prompt: ChatInput
+    ) -> tuple[str | None, list, str]:
+        """Returns the system instruction, the previous messages, and the last message in the Gemini format."""
+        system_prompt = None
+        if prompt and prompt[0]["role"] == "system":
+            system_prompt = prompt[0]["content"]
+            prompt = prompt[1:]
+        last_message = prompt[-1]["content"]
+        prompt = prompt[:-1]
+        return (
+            system_prompt,
+            [{"role": msg["role"], "parts": [msg["content"]]} for msg in prompt],
+            last_message,
+        )
 
 
 class AnthropicEngine(ClientEngine):
@@ -749,6 +813,7 @@ ENGINES = {
         GroqEngine,
         AnthropicEngine,
         ModalEngine,
+        GeminiEngine,
     )
 }
 

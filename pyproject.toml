@@ -46,6 +46,7 @@ llm = [
     "modal",
     "anthropic",
     "openai",
+    "google-generativeai"
 ]
 dev = [
     "build",
