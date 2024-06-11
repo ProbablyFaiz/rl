@@ -137,7 +137,7 @@ class ManualEditEngine(InferenceEngine):
             else prompt
         )
 
-        with tempfile.NamedTemporaryFile(suffix=".tmp") as tf:
+        with tempfile.NamedTemporaryFile(suffix=".md") as tf:
             tf.write(prompt.encode())
             if self.response_template:
                 tf.write(f"\n{_RESPONSE_CANARY}\n{self.response_template}".encode())
