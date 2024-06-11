@@ -181,9 +181,9 @@ class ClientEngine(InferenceEngine, ABC):
 
 
 class OpenAIClientEngine(InferenceEngine, ABC):
-    NAME: str
-    BASE_URL: str
-    API_KEY_NAME: str
+    NAME: str = "openai"
+    BASE_URL: str = "https://api.openai.com/v1"
+    API_KEY_NAME: str = "OPENAI_API_KEY"
     llm_config: LLMConfig
     client: openai.Client
 
