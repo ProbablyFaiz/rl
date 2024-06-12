@@ -9,6 +9,7 @@ from rl.llm.engines import ChatInput, InferenceOutput
 from rl.utils.io import get_data_path, getenv
 
 OPENAI_API_KEY = getenv("OPENAI_API_KEY")
+OPENAI_ORGANIZATION = getenv("OPENAI_ORGANIZATION")
 
 class OpenAIBatch:
     model: str
@@ -29,7 +30,7 @@ class OpenAIBatch:
         response: list[InferenceOutput] | None = None,
         id_prefix: str = "batch-inference-",
     ) -> None:
-        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        self.client = openai.OpenAI(api_key=OPENAI_API_KEY, organization=OPENAI_ORGANIZATION)
         self.request = request
         self.model = model
         self.max_tokens = max_tokens
@@ -109,7 +110,7 @@ class OpenAIBatch:
                 text=response_map[req["custom_id"]]["response"]["body"]["choices"][0]["message"]["content"],
                 metadata=response_map[req["custom_id"]]
             )
-            for req in self.request
+            for req in self.prepare_batch()
         ]
         self.response = inference_outputs
         return inference_outputs
@@ -120,15 +121,17 @@ class OpenAIBatch:
             return None
         return [
             {
-                "text": str,
-                "prompt": list[ChatInput],
-                "metadata": dict,
+                "text": r.text,
+                "prompt": r.prompt,
+                "metadata": r.metadata,
             }
             for r in self.response
         ]
 
     @classmethod
     def deserialize_response(cls, response: list[dict]) -> list[InferenceOutput]:
+        if not response:
+            return None
         return [
             InferenceOutput(
                 prompt=r["prompt"],
@@ -139,7 +142,7 @@ class OpenAIBatch:
         ]
 
 
-    def write(self, path: Path | str | None) -> None:
+    def write(self, path: Path | str | None=None) -> None:
         if not path:
             path = get_data_path() / f"openai_batch_{datetime.now().isoformat()}.json"
         if isinstance(path, str):
