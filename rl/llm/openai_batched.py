@@ -107,6 +107,7 @@ class OpenAIBatch:
             )
             for r in response
         ]
+        self.response = inference_outputs
         return inference_outputs
 
 
