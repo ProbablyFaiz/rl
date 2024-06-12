@@ -111,6 +111,30 @@ class OpenAIBatch:
         return inference_outputs
 
 
+    def serialized_response(self) -> list[dict] | None:
+        if not self.response:
+            return None
+        return [
+            {
+                "text": str
+                "prompt": list[ChatInput],
+                "metadata": dict
+            }
+            for r in self.response
+        ]
+
+    @classmethod
+    def deserialize_response(cls, response: list[dict]) -> list[InferenceOutput]:
+        return [
+            InferenceOutput(
+                prompt=r["prompt"],
+                text=r["text"],
+                metadata=r["metadata"],
+            )
+            for r in response
+        ]
+
+
     def write(self, path: Path | str | None) -> None:
         if not path:
             path = get_data_path() / f"openai_batch_{datetime.now().isoformat()}.json"
@@ -121,7 +145,7 @@ class OpenAIBatch:
             "request": self.request,
             "file_id": self.file_id,
             "batch_id": self.batch_id,
-            "response": self.response,
+            "response": self.serialized_response(),
             "max_tokens": self.max_tokens,
             "id_prefix": self.id_prefix,
         }
@@ -140,7 +164,7 @@ class OpenAIBatch:
             model=read_dict["model"],
             file_id=read_dict["file_id"],
             batch_id=read_dict["batch_id"],
-            response=read_dict["response"],
+            response=OpenAIBatch.deserialize_response(read_dict["response"]),
             max_tokens=read_dict["max_tokens"],
             id_prefix=read_dict.get("id_prefix", "batch-inference-"),
         )
