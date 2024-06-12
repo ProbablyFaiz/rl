@@ -99,13 +99,17 @@ class OpenAIBatch:
             r["custom_id"]: r["body"]["messages"]
             for r in self.prepare_batch()
         }
+        response_map = {
+            r["custom_id"]: r
+            for r in response
+        }
         inference_outputs = [
             InferenceOutput(
-                prompt=request_map[r["custom_id"]],
-                text=r["response"]["body"]["choices"][0]["message"]["content"],
-                metadata=r,
+                prompt=req,
+                text=response_map[req["custom_id"]]["response"]["body"]["choices"][0]["message"]["content"],
+                metadata=response_map[req["custom_id"]]
             )
-            for r in response
+            for req in self.request
         ]
         self.response = inference_outputs
         return inference_outputs
