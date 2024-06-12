@@ -120,9 +120,9 @@ class OpenAIBatch:
             return None
         return [
             {
-                "text": str
+                "text": str,
                 "prompt": list[ChatInput],
-                "metadata": dict
+                "metadata": dict,
             }
             for r in self.response
         ]
