@@ -53,7 +53,7 @@ class OpenAIBatch:
         }
         batch = []
         for n, req in enumerate(self.request):
-            formatted_request = batch_template.copy()
+            formatted_request = dict(batch_template)
             formatted_request["custom_id"] = f"{self.id_prefix}{n}"
             formatted_request["body"]["messages"] = req
             batch.append(formatted_request)
