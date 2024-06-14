@@ -66,6 +66,7 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 rl = "rl.cli.main:cli"
+train_llm = "rl.llm.train_llm:main"
 
 [tool.setuptools.packages]
 find = {}
