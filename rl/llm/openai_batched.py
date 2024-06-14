@@ -24,8 +24,8 @@ class OpenAIBatch:
     def __init__(
         self,
         request: list[list[ChatInput]],
-        metadata: list[dict] = [],
         model: str,
+        metadata: list[dict] = [],
         max_tokens: int = 1000,
         file_id: str | None = None,
         batch_id: str | None = None,
@@ -33,7 +33,7 @@ class OpenAIBatch:
         id_prefix: str = "batch-inference-",
     ) -> None:
         self.client = openai.OpenAI(api_key=OPENAI_API_KEY, organization=OPENAI_ORGANIZATION)
-        metadata = metadata
+        self.metadata = metadata
         if len(metadata) != 0 and len(metadata) != len(request):
             raise ValueError("Metadata must be empty or have the same length as the request, since it's zipped together.")
         self.request = request
@@ -47,7 +47,7 @@ class OpenAIBatch:
 
     def prepare_batch(self) -> list[dict]:
         return [
-            formatted_request = {
+            {
                 "custom_id": f"{self.id_prefix}{n}",
                 "method": "POST",
                 "url": "/v1/chat/completions",
@@ -57,7 +57,7 @@ class OpenAIBatch:
                     "max_tokens": self.max_tokens,
                 },
             }
-            for n, req in enumerate(self.request):
+            for n, req in enumerate(self.request)
         ]
 
 
@@ -73,20 +73,13 @@ class OpenAIBatch:
 
 
     def create_batch(self) -> str:
-        metadata = {
-            batch["custom_id"]: meta
-            for batch, meta in zip(
-                self.prepare_batch(),
-                self.metadata,
-            )
-        }
         if not self.file_id:
             self.upload_file()
         batch = self.client.batches.create(
             input_file_id=self.file_id,
             endpoint="/v1/chat/completions",
             completion_window="24h",
-            metadata=metadata,
+            metadata=self.prepare_metadata(),
         )
         self.batch_id = batch.id
         return self.batch_id
@@ -96,6 +89,19 @@ class OpenAIBatch:
         if not self.batch_id:
             raise ValueError("No batch ID found. Please create a batch first.")
         return self.client.batches.retrieve(self.batch_id).status
+
+
+    def prepare_metadata(self) -> dict:
+        metadata = {
+            batch["custom_id"]: meta
+            for batch, meta in zip(
+                self.prepare_batch(),
+                self.metadata,
+            )
+        }
+        # otherwise, only 16 keys are allowed
+        metadata = { "batch_metadata": metadata }
+        return metadata
 
 
     def get_response(self) -> list[InferenceOutput]:
@@ -108,15 +114,13 @@ class OpenAIBatch:
             r["custom_id"]: r["body"]["messages"]
             for r in self.prepare_batch()
         }
-        response_map = {
-            r["custom_id"]: r
-            for r in response
-        }
+        metadata_map = self.prepare_metadata()["batch_metadata"]
+            
         inference_outputs = [
             InferenceOutput(
                 prompt=req,
                 text=response_map[req["custom_id"]]["response"]["body"]["choices"][0]["message"]["content"],
-                metadata=response_map[req["custom_id"]]
+                metadata=metadata_map[req["custom_id"]],
             )
             for req in self.prepare_batch()
         ]
@@ -161,6 +165,7 @@ class OpenAIBatch:
             "file_id": self.file_id,
             "batch_id": self.batch_id,
             "response": self.serialized_response(),
+            "metadata": self.metadata,
             "max_tokens": self.max_tokens,
             "id_prefix": self.id_prefix,
         }
@@ -180,6 +185,7 @@ class OpenAIBatch:
             file_id=read_dict["file_id"],
             batch_id=read_dict["batch_id"],
             response=OpenAIBatch.deserialize_response(read_dict["response"]),
+            metadata=read_dict.get("metadata", []),
             max_tokens=read_dict["max_tokens"],
             id_prefix=read_dict.get("id_prefix", "batch-inference-"),
         )
