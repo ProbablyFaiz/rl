@@ -110,9 +110,9 @@ class OpenAIBatch:
         response_file_id = self.client.batches.retrieve(self.batch_id).output_file_id
         content = self.client.files.content(file_id=response_file_id)
         response = [json.loads(line) for line in content.read().decode("utf-8").split("\n") if line]
-        request_map = {
-            r["custom_id"]: r["body"]["messages"]
-            for r in self.prepare_batch()
+        response_map = {
+            r["custom_id"]: r
+            for r in response
         }
         metadata_map = self.prepare_metadata()["batch_metadata"]
             
