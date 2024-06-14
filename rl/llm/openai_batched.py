@@ -14,7 +14,6 @@ OPENAI_ORGANIZATION = getenv("OPENAI_ORGANIZATION")
 class OpenAIBatch:
     model: str
     request: list[list[ChatInput]]
-    metadata: list[dict]
     client: openai.OpenAI
     file_id: str | None = None
     batch_id: str | None = None
@@ -25,7 +24,6 @@ class OpenAIBatch:
         self,
         request: list[list[ChatInput]],
         model: str,
-        metadata: list[dict] = [],
         max_tokens: int = 1000,
         file_id: str | None = None,
         batch_id: str | None = None,
@@ -33,9 +31,6 @@ class OpenAIBatch:
         id_prefix: str = "batch-inference-",
     ) -> None:
         self.client = openai.OpenAI(api_key=OPENAI_API_KEY, organization=OPENAI_ORGANIZATION)
-        self.metadata = metadata
-        if len(metadata) != 0 and len(metadata) != len(request):
-            raise ValueError("Metadata must be empty or have the same length as the request, since it's zipped together.")
         self.request = request
         self.model = model
         self.max_tokens = max_tokens
@@ -79,7 +74,6 @@ class OpenAIBatch:
             input_file_id=self.file_id,
             endpoint="/v1/chat/completions",
             completion_window="24h",
-            metadata=self.prepare_metadata(),
         )
         self.batch_id = batch.id
         return self.batch_id
@@ -89,19 +83,6 @@ class OpenAIBatch:
         if not self.batch_id:
             raise ValueError("No batch ID found. Please create a batch first.")
         return self.client.batches.retrieve(self.batch_id).status
-
-
-    def prepare_metadata(self) -> dict:
-        metadata = {
-            batch["custom_id"]: meta
-            for batch, meta in zip(
-                self.prepare_batch(),
-                self.metadata,
-            )
-        }
-        # otherwise, only 16 keys are allowed
-        metadata = { "batch_metadata": metadata }
-        return metadata
 
 
     def get_response(self) -> list[InferenceOutput]:
@@ -114,13 +95,12 @@ class OpenAIBatch:
             r["custom_id"]: r
             for r in response
         }
-        metadata_map = self.prepare_metadata()["batch_metadata"]
             
         inference_outputs = [
             InferenceOutput(
                 prompt=req,
                 text=response_map[req["custom_id"]]["response"]["body"]["choices"][0]["message"]["content"],
-                metadata=metadata_map[req["custom_id"]],
+                metadata=response_map[req["custom_id"]],
             )
             for req in self.prepare_batch()
         ]
@@ -135,7 +115,6 @@ class OpenAIBatch:
             {
                 "text": r.text,
                 "prompt": r.prompt,
-                "metadata": r.metadata,
             }
             for r in self.response
         ]
@@ -148,7 +127,7 @@ class OpenAIBatch:
             InferenceOutput(
                 prompt=r["prompt"],
                 text=r["text"],
-                metadata=r["metadata"],
+                metadata=r,
             )
             for r in response
         ]
@@ -165,7 +144,6 @@ class OpenAIBatch:
             "file_id": self.file_id,
             "batch_id": self.batch_id,
             "response": self.serialized_response(),
-            "metadata": self.metadata,
             "max_tokens": self.max_tokens,
             "id_prefix": self.id_prefix,
         }
@@ -185,7 +163,46 @@ class OpenAIBatch:
             file_id=read_dict["file_id"],
             batch_id=read_dict["batch_id"],
             response=OpenAIBatch.deserialize_response(read_dict["response"]),
-            metadata=read_dict.get("metadata", []),
             max_tokens=read_dict["max_tokens"],
             id_prefix=read_dict.get("id_prefix", "batch-inference-"),
         )
+
+
+def _integration_test():
+    # end to end test with 2 requests
+    request = [
+        [
+            {
+                "role": "system",
+                "content": "this is a test, respond exactly with one word, 'success'",
+            },
+        ],
+        [
+            {
+                "role": "system",
+                "content": "this is a test, respond exactly with one word, 'failure'",
+            },
+        ],
+    ]
+
+    batch = OpenAIBatch(request, model="gpt-4o", max_tokens=10)
+    batch.create_batch()
+    # poll until status is 'complete'
+    import time
+    while batch.check_status() != "completed":
+        time.sleep(5)
+    batch.get_response()
+    # write batch to tempfile and read it
+    import tempfile
+    with tempfile.NamedTemporaryFile() as f:
+        batch.write(f.name)
+        batch = OpenAIBatch.read(f.name)
+    assert batch.response[0].text == "success"
+    assert batch.response[1].text == "failure"
+    print("Test passed!")
+
+if __name__ == "__main__":
+    # launch ipdb on failure
+    import ipdb
+    with ipdb.launch_ipdb_on_exception():
+        _integration_test()
