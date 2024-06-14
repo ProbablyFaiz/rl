@@ -14,6 +14,7 @@ OPENAI_ORGANIZATION = getenv("OPENAI_ORGANIZATION")
 class OpenAIBatch:
     model: str
     request: list[list[ChatInput]]
+    metadata: list[dict]
     client: openai.OpenAI
     file_id: str | None = None
     batch_id: str | None = None
@@ -23,6 +24,7 @@ class OpenAIBatch:
     def __init__(
         self,
         request: list[list[ChatInput]],
+        metadata: list[dict] = [],
         model: str,
         max_tokens: int = 1000,
         file_id: str | None = None,
@@ -31,6 +33,9 @@ class OpenAIBatch:
         id_prefix: str = "batch-inference-",
     ) -> None:
         self.client = openai.OpenAI(api_key=OPENAI_API_KEY, organization=OPENAI_ORGANIZATION)
+        metadata = metadata
+        if len(metadata) != 0 and len(metadata) != len(request):
+            raise ValueError("Metadata must be empty or have the same length as the request, since it's zipped together.")
         self.request = request
         self.model = model
         self.max_tokens = max_tokens
@@ -41,23 +46,19 @@ class OpenAIBatch:
 
 
     def prepare_batch(self) -> list[dict]:
-        batch_template = {
-            "custom_id": None,
-            "method": "POST",
-            "url": "/v1/chat/completions",
-            "body": {
-                "model": self.model,
-                "messages": None,
-                "max_tokens": self.max_tokens,
-            },
-        }
-        batch = []
-        for n, req in enumerate(self.request):
-            formatted_request = dict(batch_template)
-            formatted_request["custom_id"] = f"{self.id_prefix}{n}"
-            formatted_request["body"]["messages"] = req
-            batch.append(formatted_request)
-        return batch
+        return [
+            formatted_request = {
+                "custom_id": f"{self.id_prefix}{n}",
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": {
+                    "model": self.model,
+                    "messages": req,
+                    "max_tokens": self.max_tokens,
+                },
+            }
+            for n, req in enumerate(self.request):
+        ]
 
 
     def upload_file(self) -> str:
@@ -71,7 +72,14 @@ class OpenAIBatch:
         return self.file_id
 
 
-    def create_batch(self, metadata={}) -> str:
+    def create_batch(self) -> str:
+        metadata = {
+            batch["custom_id"]: meta
+            for batch, meta in zip(
+                self.prepare_batch(),
+                self.metadata,
+            )
+        }
         if not self.file_id:
             self.upload_file()
         batch = self.client.batches.create(
