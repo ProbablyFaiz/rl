@@ -15,8 +15,8 @@ IGNORE_INDEX = -100
 @dataclass
 class DataCollatorForCausalLM(object):
     tokenizer: transformers.PreTrainedTokenizer
-    input_max_len: int
-    output_max_len: int
+    # input_max_len: int
+    # output_max_len: int
     train_on_input: bool
     predict_with_generate: bool
 
@@ -42,8 +42,8 @@ class DataCollatorForCausalLM(object):
         ]
         tokenized_inputs = self.tokenizer(
             sources,
-            max_length=self.input_max_len,
-            truncation=True,
+            # max_length=self.input_max_len,
+            # truncation=True,
             add_special_tokens=False,
         )
         if not self.predict_with_generate:
@@ -53,8 +53,8 @@ class DataCollatorForCausalLM(object):
             ]
             tokenized_outputs = self.tokenizer(
                 targets,
-                max_length=self.output_max_len,
-                truncation=True,
+                # max_length=self.output_max_len,
+                # truncation=True,
                 add_special_tokens=False,
             )
         else:

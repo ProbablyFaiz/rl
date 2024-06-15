@@ -416,8 +416,8 @@ def get_trainer(
                 tokenizer,
                 train_on_input=False,
                 predict_with_generate=False,
-                input_max_len=4096,
-                output_max_len=2048,
+                # input_max_len=4096,
+                # output_max_len=2048,
             ),
         }
 
