@@ -272,9 +272,7 @@ class GeminiEngine(InferenceEngine):
             },
             system_instruction=system_message,
         )
-        chat_session = model.start_chat(
-            history=prev_messages,
-        )
+        chat_session = model.start_chat(history=prev_messages)
         # Can't include the last message in the history, because
         #  that would make too much sense!
         response = chat_session.send_message(last_message)
