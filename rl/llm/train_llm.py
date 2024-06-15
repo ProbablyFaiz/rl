@@ -105,6 +105,14 @@ _DEFAULT_MERGED_DIR = rl.utils.io.get_model_path("merged")
     help="The batch size to use. 0 for auto.",
 )
 @click.option(
+    "--gradient_accumulation_steps",
+    "-gas",
+    type=int,
+    default=lambda: 64 // (click.get_current_context().params["batch_size"] or 4),
+    show_default=True,
+    help="Accumulate gradients over this many steps.",
+)
+@click.option(
     "--eval_steps",
     type=int,
     default=250,
@@ -163,6 +171,7 @@ def main(
     learning_rate: float,
     num_epochs: float,
     batch_size: int,
+    gradient_accumulation_steps: int,
     eval_steps: int,
     skip_confirmation: bool,
     deepspeed_config: Path,
@@ -194,6 +203,7 @@ def main(
         learning_rate=learning_rate,
         num_epochs=num_epochs,
         batch_size=batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         eval_steps=eval_steps,
         world_size=world_size,
         output_dir=output_dir,
@@ -337,6 +347,7 @@ def get_trainer(
     learning_rate,
     num_epochs,
     batch_size,
+    gradient_accumulation_steps,
     eval_steps,
     world_size,
     output_dir,
@@ -346,7 +357,6 @@ def get_trainer(
     dpo_beta=None,
     deepspeed_config=None,
 ):
-    gradient_accumulation_steps = 64 // (batch_size or 4)
     if world_size > 1:
         gradient_accumulation_steps = gradient_accumulation_steps // world_size
     if world_size == 1 and torch.cuda.device_count() > 1:
