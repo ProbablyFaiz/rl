@@ -116,8 +116,8 @@ def get_best_ngram_match(
             )
             for sent in para["sentences"]
         ]
-        start = min(sentences, key=lambda s: abs(s.start - start))["start"]
-        end = max(sentences, key=lambda s: abs(s.end - end))["end"]
+        start = min(sentences, key=lambda s: abs(s["start"] - start))["start"]
+        end = max(sentences, key=lambda s: abs(s["end"] - end))["end"]
 
     return start, end
 
