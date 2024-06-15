@@ -51,7 +51,7 @@ _DEFAULT_MERGED_DIR = rl.utils.io.get_model_path("merged")
     "-t",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
-    help="Path to the JSONL training data file.",
+    help="Path to the JSONL training data file. Keys are `input` `output`, and `metadata`.",
 )
 @click.option(
     "--val_data_path",
