@@ -378,7 +378,7 @@ def get_trainer(
         deepspeed=deepspeed_config,
         # Save configuration
         save_strategy="steps",
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         save_steps=eval_steps,
         eval_steps=eval_steps,
         save_total_limit=6,

@@ -68,6 +68,7 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 rl = "rl.cli.main:cli"
 train_llm = "rl.llm.train_llm:main"
+merge_lora = "rl.llm.merge_lora:merge_lora"
 
 [tool.setuptools.packages]
 find = {}
