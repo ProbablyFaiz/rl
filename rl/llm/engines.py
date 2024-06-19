@@ -304,7 +304,13 @@ class GeminiEngine(InferenceEngine):
         prompt = prompt[:-1]
         return (
             system_prompt,
-            [{"role": msg["role"], "parts": [msg["content"]]} for msg in prompt],
+            [
+                {
+                    "role": "model" if msg["role"] == "assistant" else msg["role"],
+                    "parts": [msg["content"]],
+                }
+                for msg in prompt
+            ],
             last_message,
         )
 
