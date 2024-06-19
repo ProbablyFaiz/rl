@@ -23,6 +23,7 @@ import openai
 import torch
 import tqdm.asyncio
 from anthropic import Anthropic
+from google.generativeai.types import HarmBlockThreshold, HarmCategory
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from transformers import AutoTokenizer, PreTrainedTokenizer
@@ -271,6 +272,12 @@ class GeminiEngine(InferenceEngine):
                 "response_mime_type": "text/plain",
             },
             system_instruction=system_message,
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            },
         )
         chat_session = model.start_chat(history=prev_messages)
         # Can't include the last message in the history, because
@@ -545,6 +552,7 @@ def _get_vllm_kwargs(llm_config):
         "disable_log_stats": True,
         "dtype": "auto",
         "gpu_memory_utilization": 0.9,
+        "enable_prefix_caching": True,
         "enable_lora": llm_config.lora_name_or_path is not None,
         "max_lora_rank": 32,
     }

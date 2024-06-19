@@ -17,7 +17,7 @@ class LLMConfig:
     context_window_tokens: int = 0
     max_new_tokens: int = 2048
     temperature: float = 0.0
-    frequency_penalty: float = 0.05  # Experiment with this
+    frequency_penalty: float = 0.2  # Experiment with this
     num_gpus: int | None = None
     visible_devices: str | None = None
 
