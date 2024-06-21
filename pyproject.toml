@@ -35,15 +35,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llm = [
+local_llm = [
+    "rl[llm]",
     "vllm==0.4.1; platform_system == 'Linux'",
-    "transformers",
-    "torch",
     "peft",
     "trl",
     "datasets",
     "wandb",
     "huggingface_hub",
+]
+llm = [
+    "transformers",
+    "torch",
     "modal",
     "anthropic",
     "openai",
