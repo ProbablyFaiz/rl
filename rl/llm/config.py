@@ -40,22 +40,22 @@ class LLMConfig:
                 f"Using context window override: {context_window_override}. This will override the context window size provided."
             )
             self.context_window_tokens = int(context_window_override)
-        elif not self.context_window_tokens:
-            try:
-                cfg = AutoConfig.from_pretrained(self.model_name_or_path)
-                if hasattr(cfg, "model_max_length"):
-                    self.context_window_tokens = cfg.model_max_length
-                elif hasattr(cfg, "max_position_embeddings"):
-                    self.context_window_tokens = cfg.max_position_embeddings
-                LOGGER.warning(
-                    f"No context window size provided. Guessing the model's max size based on its config: "
-                    f"{self.context_window_tokens}. You can override this by providing the env variable CONTEXT_WINDOW."
-                )
-            except OSError:
-                LOGGER.warning(
-                    "No context window size provided, and it could not be inferred. "
-                    "Setting context_window_tokens to None; this may cause downstream errors."
-                )
+        # elif not self.context_window_tokens:
+        #     try:
+        #         cfg = AutoConfig.from_pretrained(self.model_name_or_path)
+        #         if hasattr(cfg, "model_max_length"):
+        #             self.context_window_tokens = cfg.model_max_length
+        #         elif hasattr(cfg, "max_position_embeddings"):
+        #             self.context_window_tokens = cfg.max_position_embeddings
+        #         LOGGER.warning(
+        #             f"No context window size provided. Guessing the model's max size based on its config: "
+        #             f"{self.context_window_tokens}. You can override this by providing the env variable CONTEXT_WINDOW."
+        #         )
+        #     except OSError:
+        #         LOGGER.warning(
+        #             "No context window size provided, and it could not be inferred. "
+        #             "Setting context_window_tokens to None; this may cause downstream errors."
+        #         )
 
 
 class QuantizationType(str, Enum):
