@@ -505,6 +505,7 @@ def _get_vllm_engine(
     engine_args = engine_args_cls(**engine_args_kwargs)  # type: ignore
     if use_async:
         engine_args.disable_log_requests = True
+    print(engine_args)
     engine = engine_cls.from_engine_args(engine_args)  # type: ignore
 
     sampling_params = SamplingParams(
@@ -554,7 +555,7 @@ def _get_vllm_kwargs(llm_config):
         "model": llm_config.model_name_or_path,
         "tensor_parallel_size": num_gpus,
         "max_model_len": llm_config.context_window_tokens,
-        "enforce_eager": rl.utils.io.getenv("ENFORCE_EAGER", "").lower() == "true",
+        "enforce_eager": rl.utils.io.getenv("ENFORCE_EAGER", "0") == "1",
         "disable_log_stats": True,
         "dtype": "auto",
         "gpu_memory_utilization": 0.9,
