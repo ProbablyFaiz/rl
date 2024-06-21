@@ -14,7 +14,7 @@ class LLMConfig:
     model_name_or_path: str
     tokenizer_name_or_path: str = ""
     lora_name_or_path: str | None = None
-    context_window_tokens: int = 0
+    context_window_tokens: int | None = None
     max_new_tokens: int = 2048
     temperature: float = 0.0
     frequency_penalty: float = 0.2  # Experiment with this
