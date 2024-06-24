@@ -20,6 +20,7 @@ class LLMConfig:
     frequency_penalty: float = 0.2  # Experiment with this
     num_gpus: int | None = None
     visible_devices: str | None = None
+    json_output: bool = False
 
     def __post_init__(self):
         if not self.tokenizer_name_or_path:
