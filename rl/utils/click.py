@@ -22,7 +22,7 @@ def excepthook(type, value, tb):
             Traceback.from_exception(type, value, tb),
         )
     else:
-        traceback.print_tb(tb)
+        traceback.print_exception(type, value, tb)
     if _DEBUG:
         ipdb.post_mortem(tb)
 
