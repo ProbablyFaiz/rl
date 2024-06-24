@@ -270,7 +270,7 @@ class GeminiEngine(InferenceEngine):
             generation_config={
                 "temperature": self.llm_config.temperature,
                 "max_output_tokens": self.llm_config.max_new_tokens,
-                "response_mime_type": "application/json" if self.config.json_output else "text/plain",
+                "response_mime_type": "application/json" if self.llm_config.json_output else "text/plain",
             },
             system_instruction=system_message,
             safety_settings={
