@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import dotenv
+import requests
+import tqdm
 
 DOTENV_LOADED = False
 
@@ -152,3 +154,23 @@ def write_csv(
         writer = csv.DictWriter(f, **kwargs)  # type: ignore
         writer.writeheader()
         writer.writerows(records)
+
+
+def download(url: str, dest: str | Path) -> None:
+    if isinstance(dest, str):
+        dest = Path(dest)
+    response = requests.get(url, stream=True)
+    total_size = int(response.headers.get("content-length", 0))
+    with (
+        open(dest, "wb") as f,
+        tqdm.tqdm(
+            desc=str(dest),
+            total=total_size,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as pbar,
+    ):
+        for data in response.iter_content(chunk_size=1024):
+            f.write(data)
+            pbar.update(len(data))
