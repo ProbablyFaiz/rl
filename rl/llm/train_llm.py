@@ -4,7 +4,6 @@
 import hashlib
 from pathlib import Path
 
-import click
 import datasets
 import pandas as pd
 import peft
@@ -15,6 +14,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingA
 import rl.llm.config
 import rl.llm.merge_lora
 import rl.utils
+import rl.utils.click as click
 import rl.utils.io
 from rl.llm.data_collator import DataCollatorForCausalLM
 

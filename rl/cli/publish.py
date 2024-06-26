@@ -4,9 +4,10 @@ import os
 import subprocess
 from pathlib import Path
 
-import click
 import github
 from dotenv import load_dotenv
+
+import rl.utils.click as click
 
 load_dotenv()
 

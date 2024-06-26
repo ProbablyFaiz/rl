@@ -1,10 +1,10 @@
 from pathlib import Path
 
-import click
 import torch
 from peft import PeftModelForCausalLM
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+import rl.utils.click as click
 import rl.utils.io
 
 

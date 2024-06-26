@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, cast
 
-import click
 import pexpect  # type: ignore
 import questionary
 import regex
@@ -19,6 +18,7 @@ import rich.progress
 import rich.table
 from strenum import StrEnum
 
+import rl.utils.click as click
 from rl.cli.duo import Duo, DuoConfig
 from rl.cli.nodelist_parser import parse_nodes_str
 

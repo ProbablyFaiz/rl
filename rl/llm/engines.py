@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, Union, cast
 
-import click
 import google.generativeai as genai
 import huggingface_hub
 import modal
@@ -29,6 +28,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 import rl.llm.modal_utils
+import rl.utils.click as click
 import rl.utils.io
 from rl.llm.config import LLMConfig
 from rl.utils import LOGGER
