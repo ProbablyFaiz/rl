@@ -11,6 +11,7 @@ from rl.utils.io import get_data_path, getenv
 OPENAI_API_KEY = getenv("OPENAI_API_KEY")
 OPENAI_ORGANIZATION = getenv("OPENAI_ORGANIZATION")
 
+
 class OpenAIBatch:
     model: str
     request: list[list[ChatInput]]
@@ -30,7 +31,9 @@ class OpenAIBatch:
         response: list[InferenceOutput] | None = None,
         id_prefix: str = "batch-inference-",
     ) -> None:
-        self.client = openai.OpenAI(api_key=OPENAI_API_KEY, organization=OPENAI_ORGANIZATION)
+        self.client = openai.OpenAI(
+            api_key=OPENAI_API_KEY, organization=OPENAI_ORGANIZATION
+        )
         self.request = request
         self.model = model
         self.max_tokens = max_tokens
@@ -38,7 +41,6 @@ class OpenAIBatch:
         self.file_id = file_id
         self.batch_id = batch_id
         self.response = response
-
 
     def prepare_batch(self) -> list[dict]:
         return [
@@ -55,7 +57,6 @@ class OpenAIBatch:
             for n, req in enumerate(self.request)
         ]
 
-
     def upload_file(self) -> str:
         jsonl_content = "\n".join([json.dumps(b) for b in self.prepare_batch()])
         json_byte_stream = io.BytesIO(jsonl_content.encode("utf-8"))
@@ -65,7 +66,6 @@ class OpenAIBatch:
         )
         self.file_id = batch_input_file.id
         return self.file_id
-
 
     def create_batch(self) -> str:
         if not self.file_id:
@@ -78,35 +78,35 @@ class OpenAIBatch:
         self.batch_id = batch.id
         return self.batch_id
 
-
     def check_status(self) -> str:
         if not self.batch_id:
             raise ValueError("No batch ID found. Please create a batch first.")
         return self.client.batches.retrieve(self.batch_id).status
-
 
     def get_response(self) -> list[InferenceOutput]:
         if not self.file_id or not self.batch_id:
             raise ValueError("No batch ID found. Please create a batch first.")
         response_file_id = self.client.batches.retrieve(self.batch_id).output_file_id
         content = self.client.files.content(file_id=response_file_id)
-        response = [json.loads(line) for line in content.read().decode("utf-8").split("\n") if line]
-        response_map = {
-            r["custom_id"]: r
-            for r in response
-        }
-            
+        response = [
+            json.loads(line)
+            for line in content.read().decode("utf-8").split("\n")
+            if line
+        ]
+        response_map = {r["custom_id"]: r for r in response}
+
         inference_outputs = [
             InferenceOutput(
                 prompt=req,
-                text=response_map[req["custom_id"]]["response"]["body"]["choices"][0]["message"]["content"],
+                text=response_map[req["custom_id"]]["response"]["body"]["choices"][0][
+                    "message"
+                ]["content"],
                 metadata=response_map[req["custom_id"]],
             )
             for req in self.prepare_batch()
         ]
         self.response = inference_outputs
         return inference_outputs
-
 
     def serialized_response(self) -> list[dict] | None:
         if not self.response:
@@ -132,8 +132,7 @@ class OpenAIBatch:
             for r in response
         ]
 
-
-    def write(self, path: Path | str | None=None) -> None:
+    def write(self, path: Path | str | None = None) -> None:
         if not path:
             path = get_data_path() / f"openai_batch_{datetime.now().isoformat()}.json"
         if isinstance(path, str):
@@ -149,7 +148,6 @@ class OpenAIBatch:
         }
         with open(path, "w") as f:
             json.dump(write_dict, f)
-
 
     @classmethod
     def read(self, path: Path | str) -> "OpenAIBatch":
@@ -189,11 +187,13 @@ def _integration_test():
     batch.create_batch()
     # poll until status is 'complete'
     import time
+
     while batch.check_status() != "completed":
         time.sleep(5)
     batch.get_response()
     # write batch to tempfile and read it
     import tempfile
+
     with tempfile.NamedTemporaryFile() as f:
         batch.write(f.name)
         batch = OpenAIBatch.read(f.name)
@@ -201,8 +201,10 @@ def _integration_test():
     assert batch.response[1].text == "failure"
     print("Test passed!")
 
+
 if __name__ == "__main__":
     # launch ipdb on failure
     import ipdb
+
     with ipdb.launch_ipdb_on_exception():
         _integration_test()
