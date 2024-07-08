@@ -3,8 +3,12 @@ from typing import Any, Callable, Iterable, TypeVar
 
 import regex
 
+import rl.utils.io
+
 K = TypeVar("K")
 T = TypeVar("T")
+
+_MAP_MODE = rl.utils.io.getenv("RL_MAP_MODE", default=None)
 
 
 def group_by(iterable: Iterable[T], key: Callable[[T], K]) -> dict[K, list[T]]:
@@ -35,7 +39,7 @@ def safe_extract(pattern: regex.Pattern, text: str, key: str) -> str | None:
 def tqdm_map(
     fn: Callable[[T], Any],
     *iterables: Iterable[T],
-    mode: str = None,
+    mode: str = _MAP_MODE,
     **tqdm_kwargs: Any,
 ) -> list[Any]:
     """Map a function over iterables with a tqdm progress bar."""
