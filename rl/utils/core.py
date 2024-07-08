@@ -4,11 +4,14 @@ from typing import Any, Callable, Iterable, TypeVar
 import regex
 
 import rl.utils.io
+from rl.utils import LOGGER
 
 K = TypeVar("K")
 T = TypeVar("T")
 
 _MAP_MODE = rl.utils.io.getenv("RL_MAP_MODE", default=None)
+if _MAP_MODE is not None:
+    assert _MAP_MODE in ("thread", "process"), f"Invalid RL_MAP_MODE: {_MAP_MODE}"
 
 
 def group_by(iterable: Iterable[T], key: Callable[[T], K]) -> dict[K, list[T]]:
