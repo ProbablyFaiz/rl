@@ -2,7 +2,6 @@ import collections
 from typing import Any, Callable, Iterable, TypeVar
 
 import regex
-from tqdm.contrib.concurrent import process_map, thread_map
 
 K = TypeVar("K")
 T = TypeVar("T")
@@ -40,9 +39,12 @@ def tqdm_map(
     **tqdm_kwargs: Any,
 ) -> list[Any]:
     """Map a function over iterables with a tqdm progress bar."""
+    import tqdm
+    from tqdm.contrib.concurrent import process_map, thread_map
+
     if mode == "thread":
         return thread_map(fn, *iterables, **tqdm_kwargs)
     elif mode == "process":
         return process_map(fn, *iterables, **tqdm_kwargs)
     else:
-        return list(map(fn, *iterables))
+        return list(tqdm.tqdm(map(fn, *iterables), **tqdm_kwargs))
