@@ -67,13 +67,14 @@ def _apply_chat_template(tokenizer, messages):
         if isinstance(messages, list) and messages and messages[0]["role"] == "system":
             messages[0]["role"] = "user"
             messages.insert(1, {"role": "assistant", "content": ""})
-            LOGGER.warning(
-                "You passed a system message to a Gemma-2 tokenizer, and it "
-                "doesn't support those. I'll try to fix it by changing the "
-                "role to 'user' and adding an empty assistant message, but "
-                "there's no guarantee this will work."
-            )
             global _WARNED_GEMMA
+            if not _WARNED_GEMMA:
+                LOGGER.warning(
+                    "You passed a system message to a Gemma-2 tokenizer, and it "
+                    "doesn't support those. I'll try to fix it by changing the "
+                    "role to 'user' and adding an empty assistant message, but "
+                    "there's no guarantee this will work."
+                )
             _WARNED_GEMMA = True
     return tokenizer.apply_chat_template(
         messages, add_generation_prompt=True, tokenize=False
