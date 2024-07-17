@@ -21,6 +21,7 @@ class LLMConfig:
     num_gpus: int | None = None
     visible_devices: str | None = None
     json_output: bool = False
+    engine_name: str | None = None
 
     def __post_init__(self):
         if not self.tokenizer_name_or_path:

@@ -789,6 +789,15 @@ def get_inference_engine_cls(engine_name: str = "vllm") -> type[InferenceEngine]
     return ENGINES[engine_name]
 
 
+def get_inference_engine(llm_config: LLMConfig) -> InferenceEngine:
+    assert llm_config.engine_name in ENGINES, (
+        f"Engine {llm_config.engine_name} not found. "
+        f"Available engines: {', '.join(ENGINES.keys())}"
+    )
+    engine_cls = get_inference_engine_cls(llm_config.engine_name)
+    return engine_cls(llm_config)
+
+
 # A decorator which injects engine configuration click options, reads them, then constructs the engine
 #  and passes it to the decorated function.
 def inject_llm_engine(defaults: dict[str, Any] | None):
