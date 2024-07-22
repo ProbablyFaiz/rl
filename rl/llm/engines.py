@@ -529,16 +529,19 @@ def _get_vllm_engine(
             "VLLM requires a CUDA-compatible GPU and PyTorch with CUDA support."
         )
 
+    if llm_config.num_gpus > 1:
+        if "VLLM_WORKER_MULTIPROC_METHOD" not in os.environ:
+            LOGGER.warning(
+                "Setting VLLM_WORKER_MULTIPROC_METHOD to 'spawn' to avoid issues with "
+                "CUDA re-initialization."
+            )
+            os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+        if "ENFORCE_EAGER" not in os.environ:
+            LOGGER.warning(
+                "Setting ENFORCE_EAGER to 1 to avoid freezing on multi-GPU graph capturing."
+            )
+            os.environ["ENFORCE_EAGER"] = "1"
     engine_args_kwargs = _get_vllm_kwargs(llm_config)
-    if (
-        engine_args_kwargs["tensor_parallel_size"] > 1
-        and "VLLM_WORKER_MULTIPROC_METHOD" not in os.environ
-    ):
-        LOGGER.warning(
-            "Setting VLLM_WORKER_MULTIPROC_METHOD to 'spawn' to avoid issues with "
-            "CUDA re-initialization."
-        )
-        os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
 
     engine_cls = AsyncLLMEngine if use_async else LLMEngine
     engine_args_cls = AsyncEngineArgs if use_async else EngineArgs
