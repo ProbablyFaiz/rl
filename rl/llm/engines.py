@@ -608,17 +608,18 @@ def _get_vllm_kwargs(llm_config):
         "max_lora_rank": 32,
     }
 
-    model_config = AutoConfig.from_pretrained(llm_config.model_name_or_path)
-    if (
-        hasattr(model_config, "quantization_config")
-        and model_config.quantization_config.get("quant_method", None) == "fp8"
-        and model_config.quantization_config.get("kv_cache_scheme") is not None
-    ):
-        LOGGER.warning(
-            "Model appears to be FP8-quantized with a KV cache scheme set. "
-            "Enabling VLLM's kv_cache_dtype=fp8 option."
-        )
-        engine_args_kwargs["kv_cache_dtype"] = "fp8"
+    # TODO: Re-enable once VLLM supports prefix caching for FP8 KV caches
+    # model_config = AutoConfig.from_pretrained(llm_config.model_name_or_path)
+    # if (
+    #     hasattr(model_config, "quantization_config")
+    #     and model_config.quantization_config.get("quant_method", None) == "fp8"
+    #     and model_config.quantization_config.get("kv_cache_scheme") is not None
+    # ):
+    #     LOGGER.warning(
+    #         "Model appears to be FP8-quantized with a KV cache scheme set. "
+    #         "Enabling VLLM's kv_cache_dtype=fp8 option."
+    #     )
+    #     engine_args_kwargs["kv_cache_dtype"] = "fp8"
     return engine_args_kwargs
 
 
