@@ -25,10 +25,11 @@ from anthropic import Anthropic
 from google.generativeai.types import HarmBlockThreshold, HarmCategory
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizer
 
 import rl.llm.modal_utils
 import rl.utils.click as click
+import rl.utils.core
 import rl.utils.io
 from rl.llm.config import LLMConfig
 from rl.utils import LOGGER
@@ -606,6 +607,18 @@ def _get_vllm_kwargs(llm_config):
         "enable_lora": llm_config.lora_name_or_path is not None,
         "max_lora_rank": 32,
     }
+
+    model_config = AutoConfig.from_pretrained(llm_config.model_name_or_path)
+    if (
+        hasattr(model_config, "quantization_config")
+        and model_config.quantization_config.get("quant_method", None) == "fp8"
+        and model_config.quantization_config.get("kv_cache_scheme") is not None
+    ):
+        LOGGER.warning(
+            "Model appears to be FP8-quantized with a KV cache scheme set. "
+            "Enabling VLLM's kv_cache_dtype=fp8 option."
+        )
+        engine_args_kwargs["kv_cache_dtype"] = "fp8"
     return engine_args_kwargs
 
 
