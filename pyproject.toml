@@ -19,6 +19,7 @@ dependencies = [
     "rich",
     "rich_click",
     "tqdm",
+    "ipdb",
     "requests",
     "regex",
     "questionary",
