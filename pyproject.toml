@@ -28,6 +28,7 @@ dependencies = [
     "pandas",
     "pyspark",
     "unidecode",
+    "watchdog",
     "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
 ]
 
@@ -75,7 +76,8 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 rl = "rl.cli.main:cli"
 train_llm = "rl.llm.train_llm:main"
-merge_lora = "rl.llm.merge_lora:merge_lora"
+merge_lora = "rl.llm.merge_lora:main"
+devsync = "rl.utils.dev_sync:main"
 
 [tool.setuptools.packages]
 find = {}

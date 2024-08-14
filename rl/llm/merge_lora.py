@@ -30,7 +30,7 @@ import rl.utils.io
     required=False,
     help="Path to write the merged model to. Will default to the same path as the LoRA model in the merged models dir.",
 )
-def merge_lora(base_model_id: str, lora_model_id: str, output_path: Path):
+def main(base_model_id: str, lora_model_id: str, output_path: Path):
     """Merge a LoRA adapter into a PeftModelForCausalLM."""
     output_path = (
         _get_output_path(Path(lora_model_id)) if output_path is None else output_path
@@ -94,4 +94,4 @@ def _get_output_path(input_path: Path) -> Path:
 
 
 if __name__ == "__main__":
-    merge_lora()
+    main()

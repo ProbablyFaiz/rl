@@ -226,7 +226,7 @@ def main(
     del trainer, tokenizer, model
     if merge_after:
         merged_dir = _DEFAULT_MERGED_DIR / (name or output_dir.name)
-        rl.llm.merge_lora.merge_lora.callback(
+        rl.llm.merge_lora.main.callback(
             base_model_id=base_model_id,
             lora_model_id=output_dir,
             output_path=merged_dir,
