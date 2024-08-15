@@ -747,8 +747,6 @@ class WorkerVLLMEngine(InferenceEngine):
             ],
             env=env,
             close_fds=True,
-            stderr=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.llm_config.tokenizer_name_or_path
