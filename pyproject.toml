@@ -41,7 +41,7 @@ sherlock = [
     "StrEnum",
 ]
 local_llm = [
-    "rl[llm]",
+    "rl[llm] @ git+https://github.com/ProbablyFaiz/rl.git@main",
     "vllm==0.5.3post1; platform_system == 'Linux'",
     "peft",
     "trl",
