@@ -24,7 +24,7 @@ import tqdm.asyncio
 from anthropic import Anthropic
 from google.generativeai.types import HarmBlockThreshold, HarmCategory
 from openai import OpenAI
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizer
 
 import rl.llm.modal_utils
 import rl.utils.click as click
@@ -599,6 +599,14 @@ def _get_vllm_kwargs(llm_config):
         num_gpus = int(torch.cuda.device_count())
         num_gpus = 2 ** int(math.log2(num_gpus))
     rl.utils.io.ensure_dotenv_loaded()
+    transformers_config = AutoConfig.from_pretrained(llm_config.model_name_or_path)
+    enable_prefix_caching = True
+    if hasattr(transformers_config, "sliding_window"):
+        enable_prefix_caching = False
+        LOGGER.warning(
+            "Model appears to have a sliding window, which VLLM doesn't support "
+            "with prefix caching. Disabling prefix caching."
+        )
     engine_args_kwargs = {
         "model": llm_config.model_name_or_path,
         "tensor_parallel_size": num_gpus,
@@ -607,7 +615,7 @@ def _get_vllm_kwargs(llm_config):
         "disable_log_stats": True,
         "dtype": "auto",
         "gpu_memory_utilization": 0.9,
-        "enable_prefix_caching": True,
+        "enable_prefix_caching": enable_prefix_caching,
         "enable_lora": llm_config.lora_name_or_path is not None,
         "max_lora_rank": 32,
     }
