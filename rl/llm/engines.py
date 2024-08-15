@@ -1,4 +1,6 @@
+# ruff: noqa: F821
 import datetime
+import importlib
 import math
 import os
 import re
@@ -14,17 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncGenerator, Iterator, TypedDict, Union, cast
 
-import google.generativeai as genai
-import huggingface_hub
-import modal
-import modal.runner
-import openai
-import torch
 import tqdm.asyncio
-from anthropic import Anthropic
-from google.generativeai.types import HarmBlockThreshold, HarmCategory
-from openai import OpenAI
-from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizer
 
 import rl.llm.modal_utils
 import rl.utils.click as click
@@ -32,20 +24,6 @@ import rl.utils.core
 import rl.utils.io
 from rl.llm.config import LLMConfig
 from rl.utils import LOGGER
-
-if (
-    torch.cuda.is_available()
-    and rl.utils.io.getenv("USE_GPU", "true").lower() != "false"
-):
-    from vllm import (
-        AsyncEngineArgs,
-        AsyncLLMEngine,
-        EngineArgs,
-        LLMEngine,
-        RequestOutput,
-        SamplingParams,
-    )
-    from vllm.lora.request import LoRARequest
 
 
 class ChatMessage(TypedDict):
@@ -89,12 +67,24 @@ def _apply_chat_template(tokenizer, messages):
 ENGINES = {}
 
 
-def _register_engine(name: str):
+def _register_engine(name: str, required_modules: tuple[str, ...] = ()):
     def decorator(cls):
+        if not all(_import_if_available(module) for module in required_modules):
+            return None
+
         ENGINES[name] = cls
         return cls
 
     return decorator
+
+
+def _import_if_available(module_name: str) -> bool:
+    try:
+        # Forgive me, lord
+        globals()[module_name] = importlib.import_module(module_name)
+        return True
+    except ModuleNotFoundError:
+        return False
 
 
 class InferenceEngine(ABC):
@@ -138,11 +128,11 @@ class InferenceEngine(ABC):
 _RESPONSE_CANARY = "### Response template begins now, delete this line. ###"
 
 
-@_register_engine("manual_edit")
+@_register_engine("manual_edit", required_modules=("transformers",))
 class ManualEditEngine(InferenceEngine):
     _EDITOR = os.environ.get("EDITOR", "vim")
 
-    tokenizer: PreTrainedTokenizer
+    tokenizer: "PreTrainedTokenizer"
 
     def __init__(
         self, llm_config: LLMConfig | None = None, response_template: str = ""
@@ -155,6 +145,7 @@ class ManualEditEngine(InferenceEngine):
     ) -> InferenceOutput:
         """Open a temp file, and put the prompt in there. Then open the file in EDITOR,
         and wait for the user to write the response. make any necessary imports in the method."""
+        from transformers import AutoTokenizer
 
         if not isinstance(prompt, str):
             if not hasattr(self, "tokenizer"):
@@ -217,12 +208,14 @@ class OpenAIClientEngine(InferenceEngine, ABC):
     BASE_URL: str = "https://api.openai.com/v1"
     API_KEY_NAME: str = "OPENAI_API_KEY"
     llm_config: LLMConfig
-    client: openai.Client
+    client: "openai.Client"
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
 
     def __enter__(self):
+        import openai
+
         self.client = openai.Client(
             api_key=rl.utils.io.getenv(self.API_KEY_NAME), base_url=self.BASE_URL
         )
@@ -256,34 +249,38 @@ class OpenAIClientEngine(InferenceEngine, ABC):
         )
 
 
-@_register_engine("together")
+@_register_engine("together", required_modules=("openai",))
 class TogetherEngine(OpenAIClientEngine):
     BASE_URL = "https://api.together.xyz/v1"
     API_KEY_NAME = "TOGETHER_API_KEY"
 
 
-@_register_engine("openai")
+@_register_engine("openai", required_modules=("openai",))
 class OpenAIEngine(OpenAIClientEngine):
     BASE_URL = "https://api.openai.com/v1"
     API_KEY_NAME = "OPENAI_API_KEY"
 
 
-@_register_engine("groq")
+@_register_engine("groq", required_modules=("openai",))
 class GroqEngine(OpenAIClientEngine):
     BASE_URL = "https://api.groq.com/openai/v1"
     API_KEY_NAME = "GROQ_API_KEY"
 
 
-@_register_engine("gemini")
+@_register_engine("gemini", required_modules=("google.generativeai",))
 class GeminiEngine(InferenceEngine):
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
 
     def __enter__(self):
+        import google.generativeai as genai
+
         genai.configure(api_key=rl.utils.io.getenv("GEMINI_API_KEY"))
         return self
 
     def generate(self, prompt: ChatInput) -> InferenceOutput:
+        from google.generativeai.types import HarmBlockThreshold, HarmCategory
+
         if not isinstance(prompt, list):
             raise ValueError(
                 "ClientEngine requires a list of dicts, in the Gemini API style."
@@ -348,7 +345,7 @@ class GeminiEngine(InferenceEngine):
         )
 
 
-@_register_engine("anthropic")
+@_register_engine("anthropic", required_modules=("anthropic",))
 class AnthropicEngine(ClientEngine):
     BASE_URL = "https://api.anthropic.com/v1"
     API_KEY_NAME = "ANTHROPIC_API_KEY"
@@ -357,6 +354,8 @@ class AnthropicEngine(ClientEngine):
         super().__init__(llm_config)
 
     def __enter__(self):
+        from anthropic import Anthropic
+
         self.client = Anthropic(api_key=rl.utils.io.getenv(self.API_KEY_NAME))
         return self
 
@@ -395,17 +394,20 @@ class AnthropicEngine(ClientEngine):
         )
 
 
-@_register_engine("modal")
+@_register_engine("modal", required_modules=("modal",))
 class ModalEngine(InferenceEngine):
     app_name: str
-    modal_call: modal.Function
-    tokenizer: PreTrainedTokenizer
+    modal_call: "modal.Function"
+    tokenizer: "PreTrainedTokenizer"
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
         self.app_name = self._get_modal_app_name(self.llm_config.model_name_or_path)
 
     def __enter__(self):
+        import modal
+        from transformers import AutoTokenizer
+
         self.modal_call = modal.Function.lookup(self.app_name, "ModalModel.call")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.llm_config.tokenizer_name_or_path
@@ -465,6 +467,8 @@ class AsyncInferenceEngine:
         self.llm_config = llm_config
 
     def __enter__(self):
+        from transformers import AutoTokenizer
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.llm_config.tokenizer_name_or_path
         )
@@ -529,6 +533,17 @@ def _get_vllm_engine(
     llm_config: LLMConfig,
     use_async: bool = False,
 ) -> tuple[Union["LLMEngine", "AsyncLLMEngine"], dict]:
+    import huggingface_hub
+    import torch
+    from vllm import (
+        AsyncEngineArgs,
+        AsyncLLMEngine,
+        EngineArgs,
+        LLMEngine,
+        SamplingParams,
+    )
+    from vllm.lora.request import LoRARequest
+
     if not torch.cuda.is_available():
         raise ValueError(
             "VLLM requires a CUDA-compatible GPU and PyTorch with CUDA support."
@@ -587,6 +602,9 @@ def _get_vllm_engine(
 
 
 def _get_vllm_kwargs(llm_config):
+    import torch
+    from transformers import AutoConfig
+
     num_gpus = llm_config.num_gpus
     # VLLM only supports a number of GPUs that is a factor of the number of
     #  attention heads (typically 32). To be safe, let's just use the closest
@@ -635,7 +653,7 @@ def _get_vllm_kwargs(llm_config):
     return engine_args_kwargs
 
 
-@_register_engine("vllm")
+@_register_engine("vllm", required_modules=("vllm",))
 class VLLMEngine(InferenceEngine):
     vllm: "LLMEngine"
     generate_kwargs: dict
@@ -679,6 +697,8 @@ class VLLMEngine(InferenceEngine):
         return inference_outputs
 
     def _get_vllm_outputs(self, prompts: list[str]):
+        from vllm import RequestOutput
+
         vllm_outputs: list[tuple[str, RequestOutput]] = []
         curr_uuid = str(uuid.uuid4())
         for i, prompt in enumerate(prompts):
@@ -707,14 +727,23 @@ class VLLMEngine(InferenceEngine):
         return [output[1] for output in vllm_outputs]
 
 
-@_register_engine("server_vllm")
+@_register_engine(
+    "server_vllm",
+    required_modules=(
+        "openai",
+        "vllm",
+    ),
+)
 class WorkerVLLMEngine(InferenceEngine):
-    client: openai.OpenAI
+    client: "openai.OpenAI"
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
 
     def __enter__(self):
+        from openai import OpenAI
+        from transformers import AutoTokenizer
+
         engine_kwargs = _get_vllm_kwargs(self.llm_config)
         engine_options = []
         for key, value in engine_kwargs.items():

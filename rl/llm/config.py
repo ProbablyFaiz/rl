@@ -1,9 +1,7 @@
+# ruff: noqa: F821
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypedDict
-
-import torch
-from transformers import AutoConfig, BitsAndBytesConfig, PreTrainedTokenizer
+from typing import Optional, TypedDict
 
 import rl.utils.io
 from rl.utils import LOGGER
@@ -66,7 +64,12 @@ class QuantizationType(str, Enum):
     FULL = "full"
 
 
-def get_quantization_config(quant_type: str | None = None) -> BitsAndBytesConfig | None:
+def get_quantization_config(
+    quant_type: str | None = None,
+) -> Optional["BitsAndBytesConfig"]:
+    import torch
+    from transformers import BitsAndBytesConfig
+
     quant_config = rl.utils.io.getenv("QUANT", default="").lower() or quant_type
     if quant_config == QuantizationType.FOUR_BIT:
         return BitsAndBytesConfig(
@@ -101,7 +104,7 @@ class KShotPrompt(TypedDict):
 
 
 def get_k_shot_prompt(
-    k_shot: KShotPrompt, prompt: str, tokenizer: PreTrainedTokenizer
+    k_shot: KShotPrompt, prompt: str, tokenizer: "PreTrainedTokenizer"
 ) -> str:
     messages = [
         {

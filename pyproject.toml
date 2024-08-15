@@ -22,11 +22,7 @@ dependencies = [
     "ipdb",
     "requests",
     "regex",
-    "questionary",
     "python-dotenv",
-    "matplotlib",
-    "pandas",
-    "pyspark",
     "unidecode",
     "watchdog",
     "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
@@ -39,8 +35,11 @@ sherlock = [
     "pycryptodome",
     "appdirs",
     "StrEnum",
+    "questionary",
 ]
 local_llm = [
+    "transformers>=4.43",
+    "torch",
     "rl[llm]",
     "vllm==0.5.3post1; platform_system == 'Linux'",
     "peft",
@@ -48,14 +47,20 @@ local_llm = [
     "datasets",
     "wandb",
     "huggingface_hub",
+    "pandas",
 ]
 llm = [
-    "transformers>=4.43",
-    "torch",
     "modal",
     "anthropic",
     "openai",
-    "google-generativeai"
+    "google-generativeai",
+]
+spark = [
+    "pyspark",
+]
+plot = [
+    "matplotlib",
+    "pandas",
 ]
 dev = [
     "build",
