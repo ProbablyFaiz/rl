@@ -43,33 +43,20 @@ class SyncHandler(FileSystemEventHandler):
 
     def sync_repo(self):
         click.echo("Syncing repository...")
-        exclude_list = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(self.local_dir),
-                "ls-files",
-                "--exclude-standard",
-                "-oi",
-                "--directory",
-                "--others",
-            ],
-            stdout=subprocess.PIPE,
-            text=True,
-            check=True,
-        )
+        git_files = subprocess.check_output(
+            ["git", "ls-files"], cwd=self.local_dir, text=True
+        ).splitlines()
+        file_list = "\n".join(git_files)
         subprocess.run(
             [
                 "rsync",
                 "-avz",
-                "--delete",
-                "--exclude-from=-",
-                "--exclude=.git",
-                f"{self.local_dir}/",
-                f"{self.remote_user}@{self.remote_host}:{self.remote_dir}/",
+                "--files-from=-",
+                str(self.local_dir),
+                str(self.remote_dir),
             ],
-            input=exclude_list.stdout.encode(),
-            check=True,
+            input=file_list,
+            text=True,
         )
         click.echo("Sync completed.")
 
