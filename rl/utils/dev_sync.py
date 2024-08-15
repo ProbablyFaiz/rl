@@ -53,7 +53,7 @@ class SyncHandler(FileSystemEventHandler):
                 "-avz",
                 "--files-from=-",
                 str(self.local_dir),
-                str(self.remote_dir),
+                f"{self.remote_user}@{self.remote_host}:{self.remote_dir}/",
             ],
             input=file_list,
             text=True,
@@ -73,7 +73,7 @@ class SyncHandler(FileSystemEventHandler):
 @click.option("-r", "--remote-dir", required=True, help="Remote directory to sync to")
 @click.option("-u", "--user", required=True, help="Remote user")
 @click.option("-h", "--host", required=True, help="Remote host")
-@click.option("-d", "--delay", default=5.0, help="Debounce delay in seconds")
+@click.option("-d", "--delay", default=2.0, help="Debounce delay in seconds")
 def main(local_dir: str, remote_dir: str, user: str, host: str, delay: float):
     local_path = Path(local_dir).resolve()
     handler = SyncHandler(local_path, user, host, remote_dir, delay)
