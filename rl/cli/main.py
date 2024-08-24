@@ -226,7 +226,7 @@ def job(
     if slurm_args:
         match slurm_args[0]:
             case "list":
-                _list_jobs()
+                _list_jobs(partition)
                 return
             case _:
                 pass
@@ -274,8 +274,8 @@ def job(
         )
 
 
-def _list_jobs():
-    jobs = _get_all_jobs()
+def _list_jobs(partition: str | None = None):
+    jobs = _get_all_jobs(partition=partition, show_progress=False)
     table = rich.table.Table()
     table.add_column("Job ID")
     table.add_column("Job Name")
@@ -348,19 +348,23 @@ def create_batch_job(sbatch_args, name, job_time):
 
 
 @_must_run_on_sherlock
-def _get_all_jobs(show_progress=False):
+def _get_all_jobs(partition: str | None = None, show_progress=False):
     if show_progress:
         with rich.progress.Progress(transient=True) as progress:
             # noinspection PyTypeChecker
             task = progress.add_task(
                 "[green]Checking jobs in queue...[/green]", total=None
             )
-            results = _get_all_jobs(show_progress=False)
+            results = _get_all_jobs(partition=partition, show_progress=False)
             progress.update(task, completed=1)
             return results
 
+    squeue_command = ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t %M %L"]
+    if partition:
+        squeue_command.extend(["-p", partition])
+
     output = subprocess.run(
-        ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t %M %L"],
+        squeue_command,
         stdout=subprocess.PIPE,
         text=True,
         check=True,
