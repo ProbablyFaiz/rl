@@ -359,9 +359,11 @@ def _get_all_jobs(partition: str | None = None, show_progress=False):
             progress.update(task, completed=1)
             return results
 
-    squeue_command = ["squeue", "-u", CURRENT_USER, "-h", "-o", "%A %j %u %P %N %t %M %L"]
+    squeue_command = ["squeue", "-h", "-o", "%A %j %u %P %N %t %M %L"]
     if partition:
         squeue_command.extend(["-p", partition])
+    else:
+        squeue_command.extend(["-u", CURRENT_USER])
 
     output = subprocess.run(
         squeue_command,
