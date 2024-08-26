@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import tqdm.asyncio
 from pydantic import BaseModel, Field
+from tqdm.contrib.concurrent import thread_map
 from typing_extensions import TypedDict
 
 import rl.llm.modal_utils
@@ -201,7 +202,9 @@ class InferenceEngine:
         Returns:
             The generated texts (not including the prompts).
         """
-        return [self.generate(prompt) for prompt in prompts]
+        return [
+            self.generate(prompt) for prompt in tqdm.tqdm(prompts, desc="Generating")
+        ]
 
 
 _RESPONSE_CANARY = "### Response template begins now, delete this line. ###"
@@ -268,6 +271,9 @@ class ManualEditEngine(InferenceEngine):
         )
 
 
+_CLIENT_ENGINE_MAX_WORKERS = int(rl.utils.io.getenv("RL_MAX_WORKERS", 4))
+
+
 class ClientEngine(InferenceEngine, ABC):
     BASE_URL: str
     API_KEY_NAME: str
@@ -276,8 +282,13 @@ class ClientEngine(InferenceEngine, ABC):
     def generate(self, prompt: ChatInput) -> InferenceOutput:
         pass
 
+    def batch_generate(self, prompts: list[ChatInput]) -> InferenceOutput:
+        return thread_map(
+            self.generate, prompts, max_workers=_CLIENT_ENGINE_MAX_WORKERS
+        )
 
-class OpenAIClientEngine(InferenceEngine, ABC):
+
+class _OpenAIClientEngine(ClientEngine, ABC):
     BASE_URL: str = "https://api.openai.com/v1"
     API_KEY_NAME: str = "OPENAI_API_KEY"
     llm_config: LLMConfig
@@ -323,19 +334,19 @@ class OpenAIClientEngine(InferenceEngine, ABC):
 
 
 @_register_engine("together", required_modules=("openai",))
-class TogetherEngine(OpenAIClientEngine):
+class TogetherEngine(_OpenAIClientEngine):
     BASE_URL = "https://api.together.xyz/v1"
     API_KEY_NAME = "TOGETHER_API_KEY"
 
 
 @_register_engine("openai", required_modules=("openai",))
-class OpenAIEngine(OpenAIClientEngine):
+class OpenAIEngine(_OpenAIClientEngine):
     BASE_URL = "https://api.openai.com/v1"
     API_KEY_NAME = "OPENAI_API_KEY"
 
 
 @_register_engine("groq", required_modules=("openai",))
-class GroqEngine(OpenAIClientEngine):
+class GroqEngine(_OpenAIClientEngine):
     BASE_URL = "https://api.groq.com/openai/v1"
     API_KEY_NAME = "GROQ_API_KEY"
 
