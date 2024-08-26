@@ -86,14 +86,14 @@ def getenv(name: str, default=None) -> str:
 
 
 def read_jsonl(filename: str | Path) -> Iterable[Any]:
+    filename = Path(filename)
     with filename.open() as f:
         for line in f:
             yield json.loads(line)
 
 
 def write_jsonl(filename: str | Path, records: Iterable[Any], overwrite=False) -> None:
-    if isinstance(filename, str):
-        filename = Path(filename)
+    filename = Path(filename)
     if filename.exists() and not overwrite:
         raise ValueError(f"{filename} already exists and overwrite is not set.")
     with filename.open("w") as f:
@@ -102,8 +102,7 @@ def write_jsonl(filename: str | Path, records: Iterable[Any], overwrite=False) -
 
 
 def write_jsonl_spark(filename: str | Path, df, overwrite=False) -> None:
-    if isinstance(filename, str):
-        filename = Path(filename)
+    filename = Path(filename)
     if filename.exists() and not overwrite:
         raise ValueError(f"{filename} already exists and overwrite is not set.")
     output_path_dir_name = filename.parent / f"{filename.stem}_dir"
@@ -114,8 +113,7 @@ def write_jsonl_spark(filename: str | Path, df, overwrite=False) -> None:
 
 
 def write_parquet_spark(filename: str | Path, df, overwrite=False) -> None:
-    if isinstance(filename, str):
-        filename = Path(filename)
+    filename = Path(filename)
     if filename.exists() and not overwrite:
         raise ValueError(f"{filename} already exists and overwrite is not set.")
 
@@ -127,6 +125,7 @@ def write_parquet_spark(filename: str | Path, df, overwrite=False) -> None:
 
 
 def read_csv(filename: str | Path) -> Iterable[dict[str, Any]]:
+    filename = Path(filename)
     with filename.open() as f:
         reader = csv.DictReader(f)
         yield from reader
@@ -139,8 +138,7 @@ def write_csv(
     field_names: list[str] | None = None,
     overwrite=False,
 ) -> None:
-    if isinstance(filename, str):
-        filename = Path(filename)
+    filename = Path(filename)
     if filename.exists() and not overwrite:
         raise ValueError(f"{filename} already exists and overwrite is not set.")
     kwargs = (
@@ -157,8 +155,7 @@ def write_csv(
 
 
 def download(url: str, dest: str | Path) -> None:
-    if isinstance(dest, str):
-        dest = Path(dest)
+    dest = Path(dest)
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get("content-length", 0))
     with (
