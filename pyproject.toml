@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "click",
     "rich",
@@ -64,14 +64,6 @@ plot = [
     "matplotlib",
     "pandas",
 ]
-dev = [
-    "build",
-    "pygithub",
-    "pyinstaller",
-    "black",
-    "isort",
-    "mypy",
-]
 
 [project.urls]
 homepage = "https://github.com/ProbablyFaiz/rl"
@@ -98,3 +90,14 @@ line-length = 88
 [tool.ruff.lint]
 extend-select = ["B", "E", "I", "N", "PTH", "COM", "C4", "UP"]
 extend-ignore = ["COM812", "B027", "E501"]
+
+[tool.uv]
+dev-dependencies = [
+    "build",
+    "pygithub",
+    "pyinstaller",
+    "mypy",
+    "ruff",
+    "pre-commit",
+    "ipython>=8.26.0",
+]

@@ -13,7 +13,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import tqdm.asyncio
 from pydantic import BaseModel, Field
@@ -40,7 +40,7 @@ class ChatMessage(TypedDict):
 
 
 ChatInput = list[ChatMessage]
-InferenceInput = Union[str, ChatInput]
+InferenceInput = str | ChatInput
 
 
 class InferenceOutput(BaseModel):
@@ -77,6 +77,10 @@ ENGINES = {}
 
 
 class InferenceEngineError(Exception):
+    pass
+
+
+class MissingEngineNameError(InferenceEngineError):
     pass
 
 
@@ -120,8 +124,8 @@ def _register_engine(
 
     def decorator(cls):
         cls.NAME = name
-        cls.REQUIRED_MODULES = required_modules
-        cls.SUPPORTED_FEATURES = supported_features
+        cls.REQUIRED_MODULES = set(required_modules)
+        cls.SUPPORTED_FEATURES = set(supported_features)
 
         new_cls = init_decorator(cls)
 
@@ -152,12 +156,21 @@ def _import_if_available(module_name: str) -> bool:
 
 class InferenceEngine(ABC):
     NAME: str
-    REQUIRED_MODULES: tuple[str, ...]
-    SUPPORTED_FEATURES: tuple[EngineFeature, ...]
+    REQUIRED_MODULES: set[str]
+    SUPPORTED_FEATURES: set[EngineFeature]
 
     llm_config: LLMConfig
 
     def __init__(self, llm_config: LLMConfig):
+        if self.__class__ is InferenceEngine:
+            if llm_config.engine_name is None:
+                raise MissingEngineNameError(
+                    "When initializing an inference engine via the base class InferenceEngine, "
+                    "you must pass an llm_config with an engine_name set. Available engine names: "
+                    f"{', '.join(ENGINES.keys())}"
+                )
+            return get_inference_engine(llm_config)
+
         rl.utils.io.ensure_dotenv_loaded()
         self.llm_config = llm_config
 
@@ -521,7 +534,7 @@ class ModalEngine(InferenceEngine):
                     "model_name_or_path": self.llm_config.model_name_or_path,
                 },
             )
-            for prompt, output_text in zip(prompts, output_texts)
+            for prompt, output_text in zip(prompts, output_texts, strict=False)
         ]
 
     def _get_modal_app_name(self, model_name: str) -> str:
@@ -778,7 +791,7 @@ class VLLMEngine(InferenceEngine):
         vllm_outputs = self._get_vllm_outputs(formatted_prompts)
 
         inference_outputs = []
-        for prompt, output in zip(prompts, vllm_outputs):
+        for prompt, output in zip(prompts, vllm_outputs, strict=False):
             inf_output = InferenceOutput(
                 prompt=prompt,
                 text=output.outputs[0].text,
@@ -952,6 +965,7 @@ def get_inference_engine(
     llm_config: LLMConfig, engine_name: str | None = None
 ) -> InferenceEngine:
     engine_name = engine_name or llm_config.engine_name
+
     assert engine_name in ENGINES, (
         f"Engine {llm_config.engine_name} not found. "
         f"Available engines: {', '.join(ENGINES.keys())}"
