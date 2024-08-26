@@ -154,7 +154,7 @@ def _import_if_available(module_name: str) -> bool:
         return False
 
 
-class InferenceEngine(ABC):
+class InferenceEngine:
     NAME: str
     REQUIRED_MODULES: set[str]
     SUPPORTED_FEATURES: set[EngineFeature]
@@ -180,7 +180,6 @@ class InferenceEngine(ABC):
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
-    @abstractmethod
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
         """Given the input prompt, returns the generated text.
 
@@ -190,7 +189,7 @@ class InferenceEngine(ABC):
         Returns:
             The generated text (not including the prompt).
         """
-        pass
+        raise NotImplementedError
 
     def batch_generate(self, prompts: list[InferenceInput]) -> list[InferenceOutput]:
         """Given the input prompts, returns the generated texts.
@@ -268,19 +267,12 @@ class ManualEditEngine(InferenceEngine):
         )
 
 
-class ClientEngine(InferenceEngine, ABC):
-    NAME: str
+class ClientEngine(InferenceEngine):
     BASE_URL: str
     API_KEY_NAME: str
-    llm_config: LLMConfig
 
-    def __init__(self, llm_config: LLMConfig):
-        rl.utils.io.ensure_dotenv_loaded()
-        self.llm_config = llm_config
-
-    @abstractmethod
     def generate(self, prompt: ChatInput) -> InferenceOutput:
-        pass
+        raise NotImplementedError
 
 
 class OpenAIClientEngine(InferenceEngine, ABC):
