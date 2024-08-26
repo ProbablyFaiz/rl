@@ -1,8 +1,21 @@
 # RL — RegLab / Sherlock utilities
 
-RL is a command-line tool which makes interacting with [Sherlock](https://www.sherlock.stanford.edu/) less painful.
+RL is a Python library which provides several things:
+- A set of utilities commonly required in Python research codebases, including:
+  - IO utils for keeping an organized data directory and working with JSONL/CSV files
+  - Scripts for training next-token LLMs with LoRA fine-tuning, as well as merging and quantizing those models.
+  - "Inference engines" that provide a unified interface for both local and API-based LLM inference,
+     including support for vLLM, OpenAI, Gemini, Anthropic, Together.AI, and other inference libraries/providers.
+  - A `devsync` CLI for automatically syncing Git-tracked files in a codebase with a remote SSH host.
+  - A drop-in replacement for the Click CLI library which provides rich formatting and an ipdb debugger
+     that activates automatically when your code raises an unhandled exception (useful for saving data!).
+- A CLI (`rl`) interacting with [Sherlock](https://www.sherlock.stanford.edu/) less painful
+   by automating Duo 2FA and providing useful primitives for working with SLURM jobs.
 
 ## Installation
+
+> NOTE: The below is only for a stable release of the Sherlock CLI. Docs for using the rest
+>  of the library are forthcoming.
 
 On your local machine:
 ```bash
