@@ -14,16 +14,24 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncGenerator, Iterator, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterator, Union, cast
 
 import tqdm.asyncio
+from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 import rl.llm.modal_utils
 import rl.utils.click as click
 import rl.utils.core
 import rl.utils.io
-from rl.llm.config import LLMConfig
+from rl.llm.config import EngineFeature, LLMConfig
 from rl.utils import LOGGER
+
+if TYPE_CHECKING:
+    import modal
+    import openai
+    import vllm
+    from transformers import PreTrainedTokenizer
 
 
 class ChatMessage(TypedDict):
@@ -35,8 +43,7 @@ ChatInput = list[ChatMessage]
 InferenceInput = Union[str, ChatInput]
 
 
-@dataclass(frozen=True)
-class InferenceOutput:
+class InferenceOutput(BaseModel):
     prompt: InferenceInput
     text: str
     metadata: dict[str, Any]  # For now, not used for anything
@@ -67,13 +74,67 @@ def _apply_chat_template(tokenizer, messages):
 ENGINES = {}
 
 
-def _register_engine(name: str, required_modules: tuple[str, ...] = ()):
-    def decorator(cls):
-        if not all(_import_if_available(module) for module in required_modules):
-            return None
+class InferenceEngineError(Exception):
+    pass
 
-        ENGINES[name] = cls
+
+class EngineNotSupportedError(InferenceEngineError):
+    pass
+
+
+class FeatureNotSupportedError(InferenceEngineError):
+    pass
+
+
+class NotSupportedSentinel:
+    reason: str
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+    def __call__(self, *_, **__):
+        raise EngineNotSupportedError(self.reason)
+
+
+def _register_engine(
+    name: str,
+    required_modules: tuple[str, ...] = (),
+    supported_features: tuple[EngineFeature, ...] = (),
+):
+    def init_decorator(cls):
+        original_init = cls.__init__
+
+        def new_init(self, llm_config: LLMConfig, *args, **kwargs):
+            if not llm_config.features.issubset(set(supported_features)):
+                raise FeatureNotSupportedError(
+                    f"Engine {name} does not support the following features: "
+                    f"{llm_config.features - set(supported_features)}"
+                )
+
+            original_init(self, llm_config, *args, **kwargs)
+
+        cls.__init__ = new_init
         return cls
+
+    def decorator(cls):
+        cls.NAME = name
+        cls.REQUIRED_MODULES = required_modules
+        cls.SUPPORTED_FEATURES = supported_features
+
+        new_cls = init_decorator(cls)
+
+        missing_modules = []
+        for module in required_modules:
+            if not _import_if_available(module):
+                missing_modules.append(module)
+        if missing_modules:
+            new_cls = NotSupportedSentinel(
+                f"Engine {name} requires the following modules which "
+                f"could not be imported: {missing_modules}"
+            )
+
+        ENGINES[name] = new_cls
+        return new_cls
 
     return decorator
 
@@ -89,6 +150,9 @@ def _import_if_available(module_name: str) -> bool:
 
 class InferenceEngine(ABC):
     NAME: str
+    REQUIRED_MODULES: tuple[str, ...]
+    SUPPORTED_FEATURES: tuple[EngineFeature, ...]
+
     llm_config: LLMConfig
 
     def __init__(self, llm_config: LLMConfig):
@@ -267,7 +331,11 @@ class GroqEngine(OpenAIClientEngine):
     API_KEY_NAME = "GROQ_API_KEY"
 
 
-@_register_engine("gemini", required_modules=("google.generativeai",))
+@_register_engine(
+    "gemini",
+    required_modules=("google.generativeai",),
+    supported_features={EngineFeature.JSON_OUTPUT},
+)
 class GeminiEngine(InferenceEngine):
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
@@ -279,6 +347,7 @@ class GeminiEngine(InferenceEngine):
         return self
 
     def generate(self, prompt: ChatInput) -> InferenceOutput:
+        import google.generativeai as genai
         from google.generativeai.types import HarmBlockThreshold, HarmCategory
 
         if not isinstance(prompt, list):
@@ -531,13 +600,10 @@ class AsyncInferenceEngine:
 
 def _get_vllm_engine(
     llm_config: LLMConfig,
-    use_async: bool = False,
-) -> tuple[Union["LLMEngine", "AsyncLLMEngine"], dict]:
+) -> tuple["VLLMEngine", dict]:
     import huggingface_hub
     import torch
     from vllm import (
-        AsyncEngineArgs,
-        AsyncLLMEngine,
         EngineArgs,
         LLMEngine,
         SamplingParams,
@@ -563,11 +629,9 @@ def _get_vllm_engine(
             os.environ["ENFORCE_EAGER"] = "1"
     engine_args_kwargs = _get_vllm_kwargs(llm_config)
 
-    engine_cls = AsyncLLMEngine if use_async else LLMEngine
-    engine_args_cls = AsyncEngineArgs if use_async else EngineArgs
+    engine_cls = VLLMEngine
+    engine_args_cls = EngineArgs
     engine_args = engine_args_cls(**engine_args_kwargs)  # type: ignore
-    if use_async:
-        engine_args.disable_log_requests = True
     print(engine_args)
     engine = engine_cls.from_engine_args(engine_args)  # type: ignore
 
@@ -655,7 +719,7 @@ def _get_vllm_kwargs(llm_config):
 
 @_register_engine("vllm", required_modules=("vllm",))
 class VLLMEngine(InferenceEngine):
-    vllm: "LLMEngine"
+    vllm: "vllm.LLMEngine"
     generate_kwargs: dict
 
     def __init__(self, llm_config: LLMConfig):
@@ -735,13 +799,13 @@ class VLLMEngine(InferenceEngine):
     ),
 )
 class WorkerVLLMEngine(InferenceEngine):
-    client: "openai.OpenAI"
+    client: "openai.Client"
 
     def __init__(self, llm_config: LLMConfig):
         super().__init__(llm_config)
 
     def __enter__(self):
-        from openai import OpenAI
+        from openai import Client
         from transformers import AutoTokenizer
 
         engine_kwargs = _get_vllm_kwargs(self.llm_config)
@@ -785,7 +849,7 @@ class WorkerVLLMEngine(InferenceEngine):
             "base_url": f"http://localhost:{port}/v1",
             "api_key": api_key,
         }
-        self.client = OpenAI(**client_kwargs)
+        self.client = Client(**client_kwargs)
 
         # Poll the list models endpoint until the server is ready
         for _ in range(100):

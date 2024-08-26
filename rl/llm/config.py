@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-from enum import Enum
 from typing import TYPE_CHECKING, Optional, TypedDict
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from strenum import StrEnum
 
 import rl.utils.io
 from rl.utils import LOGGER
@@ -9,21 +10,37 @@ if TYPE_CHECKING:
     from transformers import BitsAndBytesConfig, PreTrainedTokenizer
 
 
-@dataclass
-class LLMConfig:
+class LLMConfig(BaseModel):
     model_name_or_path: str
     tokenizer_name_or_path: str = ""
-    lora_name_or_path: str | None = None
-    context_window_tokens: int | None = None
+    lora_name_or_path: Optional[str] = None
+
+    context_window_tokens: Optional[int] = None
     max_new_tokens: int = 2048
     temperature: float = 0.0
-    frequency_penalty: float = 0.2  # Experiment with this
-    num_gpus: int | None = None
-    visible_devices: str | None = None
-    json_output: bool = False
-    engine_name: str | None = None
+    frequency_penalty: float = Field(0.2, description="Experiment with this")
 
-    def __post_init__(self):
+    json_output: bool = False
+    return_logprobs: bool = False
+
+    num_gpus: Optional[int] = None
+    visible_devices: Optional[str] = None
+
+    engine_name: Optional[str] = None
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:
+            kwargs.update({"model_name_or_path": args[0]})
+        elif len(args) > 1:
+            raise ValueError(
+                "LLMConfig takes at most one positional argument for model_name_or_path."
+            )
+        super().__init__(**kwargs)
+
+    @model_validator(mode="after")
+    def set_defaults_and_overrides(self):
         if not self.tokenizer_name_or_path:
             self.tokenizer_name_or_path = self.model_name_or_path
         if model_override := rl.utils.io.getenv("MODEL_OVERRIDE"):
@@ -36,31 +53,29 @@ class LLMConfig:
                 f"Using LORA override: {lora_override}. This will override the LORA name or path provided."
             )
             self.lora_name_or_path = lora_override
-
         if context_window_override := rl.utils.io.getenv("CONTEXT_WINDOW"):
             LOGGER.warning(
                 f"Using context window override: {context_window_override}. This will override the context window size provided."
             )
             self.context_window_tokens = int(context_window_override)
-        # elif not self.context_window_tokens:
-        #     try:
-        #         cfg = AutoConfig.from_pretrained(self.model_name_or_path)
-        #         if hasattr(cfg, "model_max_length"):
-        #             self.context_window_tokens = cfg.model_max_length
-        #         elif hasattr(cfg, "max_position_embeddings"):
-        #             self.context_window_tokens = cfg.max_position_embeddings
-        #         LOGGER.warning(
-        #             f"No context window size provided. Guessing the model's max size based on its config: "
-        #             f"{self.context_window_tokens}. You can override this by providing the env variable CONTEXT_WINDOW."
-        #         )
-        #     except OSError:
-        #         LOGGER.warning(
-        #             "No context window size provided, and it could not be inferred. "
-        #             "Setting context_window_tokens to None; this may cause downstream errors."
-        #         )
+        return self
+
+    @property
+    def features(self) -> set["EngineFeature"]:
+        features = set()
+        if self.json_output:
+            features.add(EngineFeature.JSON_OUTPUT)
+        if self.return_logprobs:
+            features.add(EngineFeature.RETURN_LOGPROBS)
+        return features
 
 
-class QuantizationType(str, Enum):
+class EngineFeature(StrEnum):
+    JSON_OUTPUT = "json_output"
+    RETURN_LOGPROBS = "return_logprobs"
+
+
+class QuantizationType(StrEnum):
     FOUR_BIT = "4bit"
     EIGHT_BIT = "8bit"
     FULL = "full"
@@ -68,7 +83,7 @@ class QuantizationType(str, Enum):
 
 def get_quantization_config(
     quant_type: str | None = None,
-) -> Optional[BitsAndBytesConfig]:
+) -> Optional["BitsAndBytesConfig"]:
     import torch
 
     quant_config = rl.utils.io.getenv("QUANT", default="").lower() or quant_type
@@ -105,7 +120,7 @@ class KShotPrompt(TypedDict):
 
 
 def get_k_shot_prompt(
-    k_shot: KShotPrompt, prompt: str, tokenizer: PreTrainedTokenizer
+    k_shot: KShotPrompt, prompt: str, tokenizer: "PreTrainedTokenizer"
 ) -> str:
     messages = [
         {
