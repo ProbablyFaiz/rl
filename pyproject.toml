@@ -89,14 +89,12 @@ devsync = "rl.utils.dev_sync:main"
 [tool.setuptools.packages]
 find = {}
 
-[tool.isort]
-profile = "black"
-src_paths = ["rl"]
-skip_gitignore = true
-
 [tool.mypy]
 disable_error_code = ["import", "override"]
 
+[tool.ruff]
+line-length = 88
+
 [tool.ruff.lint]
-extend-select = ["I"]
-extend-ignore = ["F401"]
+extend-select = ["B", "E", "I", "N", "PTH", "COM", "C4", "UP"]
+extend-ignore = ["COM812", "B027", "E501"]

@@ -1,10 +1,10 @@
 import collections
-from typing import Any, Callable, Iterable, TypeVar
+from collections.abc import Iterable
+from typing import Any, Callable, TypeVar
 
 import regex
 
 import rl.utils.io
-from rl.utils import LOGGER
 
 K = TypeVar("K")
 T = TypeVar("T")

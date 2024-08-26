@@ -2,8 +2,9 @@ import csv
 import json
 import os
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import dotenv
 import requests
@@ -85,7 +86,7 @@ def getenv(name: str, default=None) -> str:
 
 
 def read_jsonl(filename: str | Path) -> Iterable[Any]:
-    with open(filename, "r") as f:
+    with filename.open() as f:
         for line in f:
             yield json.loads(line)
 
@@ -95,7 +96,7 @@ def write_jsonl(filename: str | Path, records: Iterable[Any], overwrite=False) -
         filename = Path(filename)
     if filename.exists() and not overwrite:
         raise ValueError(f"{filename} already exists and overwrite is not set.")
-    with open(filename, "w") as f:
+    with filename.open("w") as f:
         for record in records:
             f.write(json.dumps(record) + "\n")
 
@@ -126,10 +127,9 @@ def write_parquet_spark(filename: str | Path, df, overwrite=False) -> None:
 
 
 def read_csv(filename: str | Path) -> Iterable[dict[str, Any]]:
-    with open(filename, "r") as f:
+    with filename.open() as f:
         reader = csv.DictReader(f)
-        for row in reader:
-            yield row
+        yield from reader
 
 
 def write_csv(
@@ -150,7 +150,7 @@ def write_csv(
         if field_names
         else {}
     )
-    with open(filename, "w") as f:
+    with filename.open("w") as f:
         writer = csv.DictWriter(f, **kwargs)  # type: ignore
         writer.writeheader()
         writer.writerows(records)
@@ -162,7 +162,7 @@ def download(url: str, dest: str | Path) -> None:
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get("content-length", 0))
     with (
-        open(dest, "wb") as f,
+        dest.open("wb") as f,
         tqdm.tqdm(
             desc=str(dest),
             total=total_size,

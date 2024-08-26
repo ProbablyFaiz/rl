@@ -28,7 +28,7 @@ CURRENT_USER = subprocess.run(
 CURRENT_GROUP = subprocess.run(
     ["id", "-gn"], stdout=subprocess.PIPE, text=True
 ).stdout.strip()
-ON_SHERLOCK = os.path.exists("/usr/bin/sbatch")
+ON_SHERLOCK = Path("/usr/bin/sbatch").exists()
 
 # Must use full path to avoid issues with conda environments
 SSH_PATH = "/bin/ssh"
@@ -131,7 +131,7 @@ def _must_run_on_sherlock(func: Callable):
 
 @cli.command(
     help="Create an interactive job, even on the owners partition",
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings={"ignore_unknown_options": True},
 )
 @click.option(
     "--partition",
@@ -439,7 +439,7 @@ def touch(paths: list[Path], recursive: bool):
 
 
 def _touch_file(path: Path):
-    with open(path, "ab") as f:
+    with path.open("ab") as f:
         f.write(b" ")
     subprocess.run(["truncate", "-s", "-1", str(path)])
 
@@ -543,7 +543,7 @@ def _select_node() -> str:
 
 @cli.command(
     help="SCP files to/from Sherlock",
-    context_settings=dict(ignore_unknown_options=True),
+    context_settings={"ignore_unknown_options": True},
 )
 @click.argument("direction", type=click.Choice(["to", "from"]))
 @click.argument("source", type=str)
@@ -665,24 +665,24 @@ def approve_duo_login():
 def _read_duo() -> DuoConfig | None:
     if not DUO_FILE.exists():
         return None
-    with open(DUO_FILE, "r") as f:
+    with DUO_FILE.open() as f:
         return json.load(f)
 
 
 def _write_duo(duo_info: DuoConfig):
-    with open(DUO_FILE, "w") as f:
+    with DUO_FILE.open("w") as f:
         json.dump(duo_info, f, indent=2)
 
 
 def _write_credentials(credentials):
-    with open(CREDENTIALS_FILE, "w") as f:
+    with CREDENTIALS_FILE.open("w") as f:
         json.dump(credentials, f, indent=2)
 
 
 def _read_credentials() -> dict[str, str] | None:
     if not CREDENTIALS_FILE.exists():
         return None
-    with open(CREDENTIALS_FILE, "r") as f:
+    with CREDENTIALS_FILE.open() as f:
         return json.load(f)
 
 

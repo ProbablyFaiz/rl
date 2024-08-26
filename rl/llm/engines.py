@@ -1,4 +1,3 @@
-# ruff: noqa: F821
 import datetime
 import importlib
 import math
@@ -12,12 +11,12 @@ import textwrap as tw
 import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator, Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterator, Union, cast
+from typing import TYPE_CHECKING, Any, Union, cast
 
 import tqdm.asyncio
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 import rl.llm.modal_utils
@@ -46,7 +45,9 @@ InferenceInput = Union[str, ChatInput]
 class InferenceOutput(BaseModel):
     prompt: InferenceInput
     text: str
-    metadata: dict[str, Any]  # For now, not used for anything
+
+    logprobs: list[dict[str, float]] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 _WARNED_GEMMA = False
@@ -571,7 +572,7 @@ class AsyncInferenceEngine:
         if not isinstance(prompt, str):
             prompt = _apply_chat_template(self.tokenizer, prompt)
         res = None
-        async for res in self.stream(prompt):  # type: ignore
+        async for res in self.stream(prompt):  # noqa: B007
             pass
         return res
 

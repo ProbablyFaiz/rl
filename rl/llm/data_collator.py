@@ -2,8 +2,8 @@
 """Source: https://medium.com/@newhardwarefound/qlora-with-llama-2-ca1b4bcf26f0"""
 
 import copy
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import torch
 import transformers
@@ -13,7 +13,7 @@ IGNORE_INDEX = -100
 
 
 @dataclass
-class DataCollatorForCausalLM(object):
+class DataCollatorForCausalLM:
     tokenizer: transformers.PreTrainedTokenizer
     # input_max_len: int
     # output_max_len: int

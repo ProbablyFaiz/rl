@@ -20,9 +20,8 @@ This module provides a decorator-based interface for creating figures and tables
 >>> plot.clean()
 """
 
-import glob
-import os
-from typing import Callable, List
+from pathlib import Path
+from typing import Callable
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -34,8 +33,8 @@ from rl.utils import io
 PlotMethod = Callable[..., Figure]
 TableMethod = Callable[..., DataFrame]
 
-plot_methods: List[PlotMethod] = []
-table_methods: List[TableMethod] = []
+plot_methods: list[PlotMethod] = []
+table_methods: list[TableMethod] = []
 
 
 def figure(func: PlotMethod):
@@ -50,22 +49,22 @@ def table(func: TableMethod):
 
 def _make_dirs(plot_formats, table_formats):
     for p in plot_formats:
-        os.makedirs(io.get_figures_path() / p, exist_ok=True)
+        (io.get_figures_path() / p).mkdir(exist_ok=True)
     for t in table_formats:
-        os.makedirs(io.get_tables_path() / t, exist_ok=True)
+        (io.get_tables_path() / t).mkdir(exist_ok=True)
 
 
-def clean(plot_formats=["png", "eps"], table_formats=["tex", "csv"]):
+def clean(plot_formats=("png", "eps"), table_formats=("tex", "csv")):
     _make_dirs(plot_formats, table_formats)
     for pf in plot_formats:
-        for f in glob.glob(f"{io.get_figures_path()}/{pf}/*.{pf}"):
-            os.remove(f)
+        for f in Path(io.get_figures_path() / pf).glob(f"*.{pf}"):
+            f.unlink()
     for tf in table_formats:
-        for f in glob.glob(f"{io.get_tables_path()}/{tf}/*.{tf}"):
-            os.remove(f)
+        for f in Path(io.get_tables_path() / tf).glob(f"*.{tf}"):
+            f.unlink()
 
 
-def run(plot_formats=["png", "eps"], table_formats=["tex", "csv"]):
+def run(plot_formats=("png", "eps"), table_formats=("tex", "csv")):
     pbar = tqdm(total=len(plot_methods) + len(table_methods))
     for pm in plot_methods[::-1]:
         figure = pm()

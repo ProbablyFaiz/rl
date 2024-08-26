@@ -146,14 +146,14 @@ class OpenAIBatch:
             "max_tokens": self.max_tokens,
             "id_prefix": self.id_prefix,
         }
-        with open(path, "w") as f:
+        with path.open("w") as f:
             json.dump(write_dict, f)
 
     @classmethod
-    def read(self, path: Path | str) -> "OpenAIBatch":
+    def read(cls, path: Path | str) -> "OpenAIBatch":
         if isinstance(path, str):
             path = Path(path)
-        with open(path, "r") as f:
+        with path.open() as f:
             read_dict = json.load(f)
         return OpenAIBatch(
             request=read_dict["request"],
