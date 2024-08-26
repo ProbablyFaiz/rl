@@ -47,7 +47,7 @@ class InferenceOutput(BaseModel):
     prompt: InferenceInput
     text: str
 
-    logprobs: list[dict[str, float]] | None = None
+    logprobs: list[dict[int, float]] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
