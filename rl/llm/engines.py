@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     import modal
     import openai
     import vllm
+    import vllm.sequence
     from transformers import PreTrainedTokenizer
 
 
@@ -599,6 +600,12 @@ class AsyncInferenceEngine:
         return await tqdm.asyncio.tqdm.gather(*tasks)
 
 
+# There's little value in making this configurable, so we
+#  just set it to 20, which is OpenAI's default.
+#  https://platform.openai.com/docs/api-reference/chat/create#chat-create-top_logprobs
+_VLLM_NUM_LOGPROBS = 20
+
+
 def _get_vllm_engine(
     llm_config: LLMConfig,
 ) -> tuple["VLLMEngine", dict]:
@@ -644,6 +651,8 @@ def _get_vllm_engine(
         frequency_penalty=llm_config.frequency_penalty,
         top_p=1.0,
     )
+    if EngineFeature.RETURN_LOGPROBS in llm_config.features:
+        sampling_params.logprobs = _VLLM_NUM_LOGPROBS
 
     lora_path = None
     if llm_config.lora_name_or_path:
@@ -720,7 +729,23 @@ def _get_vllm_kwargs(llm_config):
     return engine_args_kwargs
 
 
-@_register_engine("vllm", required_modules=("vllm",))
+def _parse_vllm_logprobs(
+    logprobs: list[dict[int, "vllm.sequence.Logprob"]] | None,
+) -> list[dict[int, float]]:
+    if logprobs is None:
+        raise ValueError("Expected logprobs in vLLM output but got None")
+
+    output = []
+    for logprob_dict in logprobs:
+        output.append({token_id: lp.logprob for token_id, lp in logprob_dict.items()})
+    return output
+
+
+@_register_engine(
+    "vllm",
+    required_modules=("vllm",),
+    supported_features=(EngineFeature.RETURN_LOGPROBS,),
+)
 class VLLMEngine(InferenceEngine):
     vllm: "vllm.LLMEngine"
     generate_kwargs: dict
@@ -754,13 +779,14 @@ class VLLMEngine(InferenceEngine):
 
         inference_outputs = []
         for prompt, output in zip(prompts, vllm_outputs):
-            inference_outputs.append(
-                InferenceOutput(
-                    prompt=prompt,
-                    text=output.outputs[0].text,
-                    metadata={},
-                )
+            inf_output = InferenceOutput(
+                prompt=prompt,
+                text=output.outputs[0].text,
+                metadata={},
             )
+            if EngineFeature.RETURN_LOGPROBS in self.llm_config.features:
+                inf_output.logprobs = _parse_vllm_logprobs(output.outputs[0].logprobs)
+            inference_outputs.append(inf_output)
         return inference_outputs
 
     def _get_vllm_outputs(self, prompts: list[str]):
