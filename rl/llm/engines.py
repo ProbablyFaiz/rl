@@ -605,8 +605,10 @@ def _get_vllm_engine(
     import torch
     from vllm import (
         EngineArgs,
-        LLMEngine,
         SamplingParams,
+    )
+    from vllm import (
+        LLMEngine as InternalVLLMEngine,
     )
     from vllm.lora.request import LoRARequest
 
@@ -629,7 +631,7 @@ def _get_vllm_engine(
             os.environ["ENFORCE_EAGER"] = "1"
     engine_args_kwargs = _get_vllm_kwargs(llm_config)
 
-    engine_cls = VLLMEngine
+    engine_cls = InternalVLLMEngine
     engine_args_cls = EngineArgs
     engine_args = engine_args_cls(**engine_args_kwargs)  # type: ignore
     print(engine_args)
