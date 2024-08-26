@@ -108,7 +108,7 @@ def _register_engine(
     supported_features: tuple[EngineFeature, ...] = (),
 ):
     def init_decorator(cls):
-        original_init = cls.__init__
+        old_init = cls.__init__
 
         def new_init(self, llm_config: LLMConfig, *args, **kwargs):
             if not llm_config.features.issubset(set(supported_features)):
@@ -117,7 +117,7 @@ def _register_engine(
                     f"{llm_config.features - set(supported_features)}"
                 )
 
-            original_init(self, llm_config, *args, **kwargs)
+            old_init(self, llm_config, *args, **kwargs)
 
         cls.__init__ = new_init
         return cls
@@ -162,15 +162,6 @@ class InferenceEngine:
     llm_config: LLMConfig
 
     def __init__(self, llm_config: LLMConfig):
-        if self.__class__ is InferenceEngine:
-            if llm_config.engine_name is None:
-                raise MissingEngineNameError(
-                    "When initializing an inference engine via the base class InferenceEngine, "
-                    "you must pass an llm_config with an engine_name set. Available engine names: "
-                    f"{', '.join(ENGINES.keys())}"
-                )
-            return get_inference_engine(llm_config)
-
         rl.utils.io.ensure_dotenv_loaded()
         self.llm_config = llm_config
 
@@ -179,6 +170,16 @@ class InferenceEngine:
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+
+    @staticmethod
+    def from_config(llm_config: LLMConfig) -> "InferenceEngine":
+        if llm_config.engine_name is None:
+            raise MissingEngineNameError(
+                "When initializing an inference engine via the base class InferenceEngine, "
+                "you must pass an llm_config with an engine_name set. Available engine names: "
+                f"{', '.join(ENGINES.keys())}"
+            )
+        return get_inference_engine(llm_config)
 
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
         """Given the input prompt, returns the generated text.
@@ -267,12 +268,13 @@ class ManualEditEngine(InferenceEngine):
         )
 
 
-class ClientEngine(InferenceEngine):
+class ClientEngine(InferenceEngine, ABC):
     BASE_URL: str
     API_KEY_NAME: str
 
+    @abstractmethod
     def generate(self, prompt: ChatInput) -> InferenceOutput:
-        raise NotImplementedError
+        pass
 
 
 class OpenAIClientEngine(InferenceEngine, ABC):
