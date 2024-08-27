@@ -153,7 +153,7 @@ def _fragment_document(
         start_indices = range(0, len(doc), stride)
     end_indices = [i + chunk_size for i in start_indices if i + chunk_size <= len(doc)]
     chunks = []
-    for i, j in zip(start_indices, end_indices):
+    for i, j in zip(start_indices, end_indices, strict=True):
         chunks.append(
             DocumentFragment(
                 start=i,

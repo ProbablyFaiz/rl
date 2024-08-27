@@ -20,8 +20,8 @@ This module provides a decorator-based interface for creating figures and tables
 >>> plot.clean()
 """
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure

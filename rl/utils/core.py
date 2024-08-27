@@ -1,6 +1,6 @@
 import collections
-from collections.abc import Iterable
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 import regex
 

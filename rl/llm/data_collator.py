@@ -35,7 +35,9 @@ class DataCollatorForCausalLM:
             else:
                 instances = [
                     {"input": input_, "output": output}
-                    for input_, output in zip(instances["input"], instances["output"])
+                    for input_, output in zip(
+                        instances["input"], instances["output"], strict=True
+                    )
                 ]
         sources = [
             f"{self.tokenizer.bos_token}{example['input']}" for example in instances
@@ -62,7 +64,7 @@ class DataCollatorForCausalLM:
         input_ids = []
         labels = []
         for tokenized_source, tokenized_target in zip(
-            tokenized_inputs["input_ids"], tokenized_outputs["input_ids"]
+            tokenized_inputs["input_ids"], tokenized_outputs["input_ids"], strict=True
         ):
             if not self.predict_with_generate:
                 input_ids.append(torch.tensor(tokenized_source + tokenized_target))
