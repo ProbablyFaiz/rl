@@ -137,9 +137,7 @@ def _must_run_on_sherlock(func: Callable):
 @click.option(
     "--partition",
     "-p",
-    help="Partition. If 'owners' specified, will create a batch job then ssh into it",
-    default=CURRENT_GROUP,
-    show_default=True,
+    help=f"Partition. Default is {CURRENT_GROUP}. If 'owners' specified, will create a batch job then ssh into it",
     type=str,
 )
 @click.option(
@@ -210,7 +208,7 @@ def _must_run_on_sherlock(func: Callable):
 )
 @_must_run_on_sherlock
 def job(
-    partition: str,
+    partition: str | None,
     name: str,
     gpus: int,
     gpu_constraint: str,
@@ -231,6 +229,12 @@ def job(
                 return
             case _:
                 pass
+
+    # We don't set the click default because we don't want the default partition
+    #  value when the user does rl job list, so we just set it after checking
+    #  that the user isn't running list
+    if not partition:
+        partition = CURRENT_GROUP
 
     LOG_DIR.mkdir(exist_ok=True, parents=True)
 
@@ -318,7 +322,7 @@ def create_batch_job(sbatch_args, name, job_time):
     ]
     subprocess.run(sbatch_args, check=True)
 
-    curr_job: JobInfo
+    curr_job: JobInfo | None
     with rich.progress.Progress(transient=True) as progress:
         # noinspection PyTypeChecker
         task = progress.add_task(
