@@ -15,11 +15,12 @@ from typing import TYPE_CHECKING, Any, cast
 import tqdm
 
 import rl.utils.io
-from rl.llm.config import EngineFeature, LLMConfig
 from rl.llm.engines.core import (
+    EngineFeature,
     InferenceEngine,
     InferenceInput,
     InferenceOutput,
+    LLMConfig,
     apply_chat_template,
     register_engine,
 )

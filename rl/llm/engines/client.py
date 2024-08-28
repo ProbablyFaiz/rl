@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING
 from tqdm.contrib.concurrent import thread_map
 
 import rl.utils.io
-from rl.llm.config import EngineFeature, LLMConfig
 from rl.llm.engines.core import (
     ChatInput,
+    EngineFeature,
     InferenceEngine,
     InferenceInput,
     InferenceOutput,
+    LLMConfig,
     apply_chat_template,
     register_engine,
 )
