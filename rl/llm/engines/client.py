@@ -24,9 +24,6 @@ if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer
 
 
-_CLIENT_ENGINE_MAX_WORKERS = int(rl.utils.io.getenv("RL_MAX_WORKERS", 4))
-
-
 class ClientEngine(InferenceEngine, ABC):
     BASE_URL: str
     API_KEY_NAME: str
@@ -37,7 +34,9 @@ class ClientEngine(InferenceEngine, ABC):
 
     def batch_generate(self, prompts: list[ChatInput]) -> InferenceOutput:
         return thread_map(
-            self.generate, prompts, max_workers=_CLIENT_ENGINE_MAX_WORKERS
+            self.generate,
+            prompts,
+            max_workers=int(rl.utils.io.getenv("RL_MAX_WORKERS", 4)),
         )
 
 
