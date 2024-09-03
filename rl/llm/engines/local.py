@@ -372,9 +372,7 @@ class VLLMEngine(InferenceEngine):
         super().__init__(llm_config)
 
     def __enter__(self):
-        self.vllm, self.generate_kwargs = _get_vllm_engine(
-            self.llm_config, use_async=False
-        )
+        self.vllm, self.generate_kwargs = _get_vllm_engine(self.llm_config)
         self.tokenizer = self.vllm.get_tokenizer()
         return self
 
