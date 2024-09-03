@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 from strenum import StrEnum
 
 import rl.utils.io
@@ -34,8 +34,7 @@ class LLMConfig(BaseModel):
             )
         super().__init__(**kwargs)
 
-    @model_validator(mode="after")
-    def set_defaults_and_overrides(self):
+    def model_post_init(self, __context):
         if not self.tokenizer_name_or_path:
             self.tokenizer_name_or_path = self.model_name_or_path
         if model_override := rl.utils.io.getenv("MODEL_OVERRIDE"):

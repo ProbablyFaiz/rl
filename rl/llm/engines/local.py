@@ -243,7 +243,7 @@ def _get_vllm_engine(
             "VLLM requires a CUDA-compatible GPU and PyTorch with CUDA support."
         )
 
-    if llm_config.num_gpus > 1:
+    if llm_config.num_gpus is not None and llm_config.num_gpus > 1:
         if "VLLM_WORKER_MULTIPROC_METHOD" not in os.environ:
             LOGGER.warning(
                 "Setting VLLM_WORKER_MULTIPROC_METHOD to 'spawn' to avoid issues with "
