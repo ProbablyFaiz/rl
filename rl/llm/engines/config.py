@@ -11,7 +11,7 @@ class LLMConfig(BaseModel):
     lora_name_or_path: str | None = None
 
     context_window_tokens: int | None = None
-    max_new_tokens: int = 2048
+    max_new_tokens: int | None = None
     temperature: float = 0.0
     frequency_penalty: float = Field(0.2, description="Experiment with this")
 

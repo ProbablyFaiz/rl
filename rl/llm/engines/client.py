@@ -1,8 +1,11 @@
+import io
+import json
 import re
 import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+import tqdm
 from tqdm.contrib.concurrent import thread_map
 
 import rl.utils.io
@@ -74,6 +77,8 @@ class _OAIClientEngine(ClientEngine, ABC):
             "model": self.llm_config.model_name_or_path,
             "messages": prompt,
         }
+        if self.llm_config.max_new_tokens is not None:
+            completion_kwargs["max_tokens"] = self.llm_config.max_new_tokens
         if EngineFeature.JSON_OUTPUT in self.enabled_features:
             completion_kwargs["response_format"] = {"type": "json_object"}
 
@@ -311,3 +316,88 @@ class ModalEngine(InferenceEngine):
 
     def _get_modal_app_name(self, model_name: str) -> str:
         return "vllm_" + re.sub(r"[^a-zA-Z0-9-]", "_", model_name)
+
+
+@register_engine(
+    "batch_openai",
+    required_modules=("openai",),
+    supported_features=(EngineFeature.JSON_OUTPUT,),
+)
+class BatchOpenAIEngine(InferenceEngine):
+    def __init__(self, llm_config: LLMConfig):
+        super().__init__(llm_config)
+        self.client = None
+
+    def __enter__(self):
+        import openai
+
+        self.client = openai.Client(api_key=rl.utils.io.getenv("OPENAI_API_KEY"))
+        return self
+
+    def batch_generate(self, prompts: list[ChatInput]) -> list[InferenceOutput]:
+        # Create in-memory JSONL file
+        jsonl_file = io.StringIO()
+        for i, prompt in enumerate(prompts):
+            body_kwargs = {
+                "model": self.llm_config.model_name_or_path,
+                "messages": prompt,
+            }
+            if self.llm_config.max_new_tokens is not None:
+                body_kwargs["max_tokens"] = self.llm_config.max_new_tokens
+            if self.llm_config.temperature is not None:
+                body_kwargs["temperature"] = self.llm_config.temperature
+            if EngineFeature.JSON_OUTPUT in self.enabled_features:
+                body_kwargs["response_format"] = {"type": "json_object"}
+            request = {
+                "custom_id": f"request-{i}",
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": body_kwargs,
+            }
+            jsonl_file.write(json.dumps(request) + "\n")
+
+        jsonl_file.seek(0)
+        batch_input_file = self.client.files.create(file=jsonl_file, purpose="batch")
+
+        batch = self.client.batches.create(
+            input_file_id=batch_input_file.id,
+            endpoint="/v1/chat/completions",
+            completion_window="24h",
+        )
+
+        # Poll for status and update progress bar
+        pbar = tqdm.tqdm(total=len(prompts), desc="Polling batch status")
+        while batch.status not in ["completed", "failed", "expired"]:
+            time.sleep(5)  # Poll every 5 seconds
+            batch = self.client.batches.retrieve(batch.id)
+            pbar.n = batch.request_counts.completed
+            pbar.refresh()
+
+        pbar.close()
+
+        if batch.status != "completed":
+            raise RuntimeError(f"Batch failed with status: {batch.status}")
+
+        # Retrieve results
+        output_file = self.client.files.content(batch.output_file_id)
+        results = [json.loads(line) for line in output_file.text.strip().split("\n")]
+
+        # Process results
+        outputs = []
+        for result in results:
+            response = result["response"]["body"]
+            outputs.append(
+                InferenceOutput(
+                    prompt=prompts[int(result["custom_id"].split("-")[1])],
+                    text=response["choices"][0]["message"]["content"],
+                    metadata={
+                        "model": self.llm_config.model_name_or_path,
+                        "base_url": "https://api.openai.com/v1",
+                    },
+                )
+            )
+
+        return outputs
+
+    def generate(self, prompt: ChatInput) -> InferenceOutput:
+        return self.batch_generate([prompt])[0]

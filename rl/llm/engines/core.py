@@ -350,13 +350,13 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
             "--context-window",
             "context_window_tokens",
             type=int,
-            default=defaults.get("context_window_tokens", 8192),
+            default=defaults.get("context_window_tokens"),
             help="The number of tokens in the context window.",
         )
         @click.option(
             "--max-new-tokens",
             type=int,
-            default=defaults.get("max_new_tokens", 1024),
+            default=defaults.get("max_new_tokens"),
             help="The maximum number of new tokens to generate.",
         )
         @click.option(
