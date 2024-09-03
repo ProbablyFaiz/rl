@@ -91,13 +91,13 @@ def register_engine(
     supported_features: tuple[EngineFeature, ...] = (),
 ):
     def init_decorator(cls):
-        old_init = cls.__init__
-        old_enter = cls.__enter__
-        old_exit = cls.__exit__
-        old_generate = cls.generate
-        old_batch_generate = cls.batch_generate
+        original_init = cls.__init__
+        original_enter = cls.__enter__
+        original_exit = cls.__exit__
+        original_generate = cls.generate
+        original_batch_generate = cls.batch_generate
 
-        def new_init(self, llm_config: LLMConfig, *args, **kwargs):
+        def wrapped_init(self, llm_config: LLMConfig, *args, **kwargs):
             if not llm_config.features.issubset(cls.SUPPORTED_FEATURES):
                 raise FeatureNotSupportedError(
                     f"Engine {name} does not support the following features: "
@@ -105,26 +105,26 @@ def register_engine(
                 )
             self.enabled_features = llm_config.features.copy()
             self.entered_context = False
-            old_init(self, llm_config, *args, **kwargs)
+            original_init(self, llm_config, *args, **kwargs)
 
-        def new_enter(self):
+        def wrapped_enter(self):
             self.entered_context = True
-            return old_enter(self)
+            return original_enter(self)
 
-        def new_exit(self, exc_type, exc_value, traceback):
+        def wrapped_exit(self, exc_type, exc_value, traceback):
             if self.entered_context:
                 self.entered_context = False
-                old_exit(self, exc_type, exc_value, traceback)
+                original_exit(self, exc_type, exc_value, traceback)
 
-        def new_generate(self, prompt: InferenceInput) -> InferenceOutput:
+        def wrapped_generate(self, prompt: InferenceInput) -> InferenceOutput:
             if not self.entered_context:
                 raise EngineNotEnteredContextError(
                     "You must enter the context of the engine by calling "
                     "`with engine as e:` before you can call `e.generate()`."
                 )
-            return old_generate(self, prompt)
+            return original_generate(self, prompt)
 
-        def new_batch_generate(
+        def wrapped_batch_generate(
             self, prompts: list[InferenceInput]
         ) -> list[InferenceOutput]:
             if not self.entered_context:
@@ -132,13 +132,13 @@ def register_engine(
                     "You must enter the context of the engine by calling "
                     "`with engine as e:` before you can call `e.batch_generate()`."
                 )
-            return old_batch_generate(self, prompts)
+            return original_batch_generate(self, prompts)
 
-        cls.__init__ = new_init
-        cls.__enter__ = new_enter
-        cls.__exit__ = new_exit
-        cls.generate = new_generate
-        cls.batch_generate = new_batch_generate
+        cls.__init__ = wrapped_init
+        cls.__enter__ = wrapped_enter
+        cls.__exit__ = wrapped_exit
+        cls.generate = wrapped_generate
+        cls.batch_generate = wrapped_batch_generate
         return cls
 
     def decorator(cls):

@@ -41,7 +41,7 @@ class ClientEngine(InferenceEngine, ABC):
         )
 
 
-class _OpenAIClientEngine(ClientEngine, ABC):
+class _OAIClientEngine(ClientEngine, ABC):
     BASE_URL: str
     API_KEY_NAME: str
     client: "openai.Client"
@@ -94,7 +94,7 @@ class _OpenAIClientEngine(ClientEngine, ABC):
     required_modules=("openai",),
     supported_features=(EngineFeature.JSON_OUTPUT,),
 )
-class TogetherEngine(_OpenAIClientEngine):
+class TogetherEngine(_OAIClientEngine):
     BASE_URL = "https://api.together.xyz/v1"
     API_KEY_NAME = "TOGETHER_API_KEY"
 
@@ -104,7 +104,7 @@ class TogetherEngine(_OpenAIClientEngine):
     required_modules=("openai",),
     supported_features=(EngineFeature.JSON_OUTPUT,),
 )
-class OpenAIEngine(_OpenAIClientEngine):
+class OpenAIEngine(_OAIClientEngine):
     BASE_URL = "https://api.openai.com/v1"
     API_KEY_NAME = "OPENAI_API_KEY"
 
@@ -114,7 +114,7 @@ class OpenAIEngine(_OpenAIClientEngine):
     required_modules=("openai",),
     supported_features=(EngineFeature.JSON_OUTPUT,),
 )
-class GroqEngine(_OpenAIClientEngine):
+class GroqEngine(_OAIClientEngine):
     BASE_URL = "https://api.groq.com/openai/v1"
     API_KEY_NAME = "GROQ_API_KEY"
 
