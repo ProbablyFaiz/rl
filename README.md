@@ -12,21 +12,22 @@ RL is a Python library which provides several things:
 - A CLI (`rl`) interacting with [Sherlock](https://www.sherlock.stanford.edu/) less painful
    by automating Duo 2FA and providing useful primitives for working with SLURM jobs.
 
-## Installation
+## CLI Installation
 
 > NOTE: The below is only for a stable release of the Sherlock CLI. Docs for using the rest
 >  of the library are forthcoming.
 
-On your local machine:
+The best way to install Sherlock is via `uv`, a fast Python installation/package manager.
+
+If you don't have it already (or have an old version), install `uv`:
 ```bash
-pip install "rl @ git+https://github.com/ProbablyFaiz/rl.git@v0.4.2"
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-On Sherlock, you should probably use the pre-compiled binary instead:
-```bash
-wget "https://github.com/ProbablyFaiz/rl/releases/download/v0.4.2/rl" -O ~/.local/bin/rl
+Then, on both your local machine and Sherlock (or either one, if you just want some features):
 ```
-
+uv tool install "rl @ git+https://github.com/ProbablyFaiz/rl.git@latest"
+```
 
 ## Setup
 
