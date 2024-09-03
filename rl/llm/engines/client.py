@@ -334,6 +334,13 @@ class BatchOpenAIEngine(InferenceEngine):
         self.client = openai.Client(api_key=rl.utils.io.getenv("OPENAI_API_KEY"))
         return self
 
+    def generate(self, prompt: ChatInput) -> InferenceOutput:
+        LOGGER.warning(
+            "You called single-item generate() on the BatchOpenAIEngine. I'll allow it, "
+            " but you almost certainly didn't mean to do this; just use the regular OpenAIEngine!"
+        )
+        return self.batch_generate([prompt])[0]
+
     def batch_generate(self, prompts: list[ChatInput]) -> list[InferenceOutput]:
         # Create in-memory JSONL file
         jsonl_file = io.StringIO()
@@ -398,6 +405,3 @@ class BatchOpenAIEngine(InferenceEngine):
             )
 
         return outputs
-
-    def generate(self, prompt: ChatInput) -> InferenceOutput:
-        return self.batch_generate([prompt])[0]
