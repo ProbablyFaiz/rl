@@ -25,7 +25,8 @@ dependencies = [
     "python-dotenv",
     "unidecode",
     "StrEnum",
-    "watchdog",  # TODO: Maybe move into an extra?
+    "watchdog",
+    # TODO: Maybe move into an extra?
     "pydantic>=2",
     "typing-extensions",
     "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
@@ -38,6 +39,7 @@ sherlock = [
     "pycryptodome",
     "appdirs",
     "questionary",
+    "paramiko",
 ]
 local_llm = [
     "transformers>=4.43",

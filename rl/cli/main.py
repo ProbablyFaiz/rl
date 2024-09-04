@@ -10,6 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import paramiko
 import pexpect  # type: ignore
 import questionary
 import regex
@@ -555,15 +556,14 @@ def ssh(node: str):
 @_require_duo
 @_require_sherlock_credentials
 def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: Duo):
-    # /usr/sbin/sshd -f ~/.ssh/sshd_config -h ~/.ssh/user_rsa -p 2222
-
-    # TODO: Do the requisite server setup by creating the config, key etc.
     sshd_config_path = SHERLOCK_SSH_DIR / "sshd_config"
-    user_key_path = SHERLOCK_SSH_DIR / "user_rsa"
+    host_key_path = SHERLOCK_SSH_DIR / "host_rsa"
 
-    server_command = (
-        f"{SSHD_PATH} -f {sshd_config_path} -h {user_key_path} -p {remote_port}"
+    _setup_tunnel_infra(
+        sshd_config_path, host_key_path, remote_port, credentials=credentials, duo=duo
     )
+
+    server_command = f"{SSHD_PATH} -f {sshd_config_path}"
     common_args = [
         f"{credentials.username}@{credentials.node}.sherlock.stanford.edu",
     ]
@@ -590,6 +590,63 @@ def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: 
         rich.print("\n[red]Tunnel stopped by user[/red]")
     except Exception as e:
         rich.print(f"[red]Error: {e}[/red]")
+
+
+@_require_sherlock_credentials
+@_require_duo
+def _setup_tunnel_infra(
+    sshd_config_path: Path,
+    host_key_path: Path,
+    remote_port: int,
+    credentials: Credentials,
+    duo: Duo,
+):
+    tunnel_setup_path = BASE_CONFIG_DIR / ".tunnel_setup"
+    if tunnel_setup_path.exists():
+        return
+
+    rich.print("[green]Running one-time setup for Sherlock tunnel...[/green]")
+
+    key = paramiko.RSAKey.generate(bits=4096)
+    private_key_path = Path.home() / ".ssh" / "sherlock_tunnel_rsa"
+    key.write_private_key_file(str(private_key_path))
+    public_key = f"{key.get_name()} {key.get_base64()}"
+
+    sshd_config = {
+        "Port": remote_port,
+        "ListenAddress": "localhost",
+        "Protocol": "2",
+        "HostKey": str(host_key_path),
+        "UsePrivilegeSeparation": "no",
+        "PubkeyAuthentication": "yes",
+        "AuthorizedKeysFile": "~/.ssh/authorized_keys",
+        "PermitRootLogin": "no",
+        "PasswordAuthentication": "no",
+        "ChallengeResponseAuthentication": "no",
+        "X11Forwarding": "no",
+        "AllowUsers": credentials.username,
+    }
+    sshd_config_text = "\n".join(f"{k} {v}" for k, v in sshd_config.items())
+
+    sherlock_commands = [
+        f"mkdir -p {SHERLOCK_SSH_DIR}",
+        f"echo '{sshd_config_text}' >> {sshd_config_path}",
+        f"ssh-keygen -t rsa -b 4096 -f {host_key_path} -N '' -C 'sherlock-tunnel'",
+        f"echo '{public_key}' >> {SHERLOCK_SSH_DIR}/authorized_keys",
+        f"chmod 600 {SHERLOCK_SSH_DIR}/authorized_keys",
+    ]
+    combined_command = " && ".join(sherlock_commands)
+    _run_sherlock_ssh(
+        "ssh",
+        [
+            f"{credentials.username}@{credentials.node}.sherlock.stanford.edu",
+            combined_command,
+        ],
+        credentials=credentials,
+        duo=duo,
+    )
+    tunnel_setup_path.touch()
+    rich.print("[green]Sherlock tunnel setup complete![/green]")
 
 
 @cli.command(
