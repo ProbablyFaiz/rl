@@ -69,6 +69,8 @@ NODE_OPTIONS = [
 SHERLOCK_HOME_DIR = Path("/home/users") / CURRENT_USER
 SHERLOCK_SSH_DIR = SHERLOCK_HOME_DIR / ".ssh"
 
+TUNNEL_HOST_NAME = "rl"
+
 _DEFAULT_SSH_SERVER_PORT = 5549
 _DEFAULT_SSH_TUNNEL_PORT = 5549
 
@@ -560,7 +562,12 @@ def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: 
     host_key_path = SHERLOCK_SSH_DIR / "host_rsa"
 
     _setup_tunnel_infra(
-        sshd_config_path, host_key_path, remote_port, credentials=credentials, duo=duo
+        sshd_config_path,
+        host_key_path,
+        local_port,
+        remote_port,
+        credentials=credentials,
+        duo=duo,
     )
 
     server_command = f"{SSHD_PATH} -f {sshd_config_path}"
@@ -597,6 +604,7 @@ def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: 
 def _setup_tunnel_infra(
     sshd_config_path: Path,
     host_key_path: Path,
+    local_port: int,
     remote_port: int,
     credentials: Credentials,
     duo: Duo,
@@ -630,7 +638,7 @@ def _setup_tunnel_infra(
 
     sherlock_commands = [
         f"mkdir -p {SHERLOCK_SSH_DIR}",
-        f"echo '{sshd_config_text}' >> {sshd_config_path}",
+        f"echo '{sshd_config_text}' > {sshd_config_path}",
         f"ssh-keygen -t rsa -b 4096 -f {host_key_path} -N '' -C 'sherlock-tunnel'",
         f"echo '{public_key}' >> {SHERLOCK_SSH_DIR}/authorized_keys",
         f"chmod 600 {SHERLOCK_SSH_DIR}/authorized_keys",
@@ -645,8 +653,22 @@ def _setup_tunnel_infra(
         credentials=credentials,
         duo=duo,
     )
-    tunnel_setup_path.touch()
+
+    # finally, create an `rl` entry in the user's .ssh/config
+    ssh_config = paramiko.SSHConfig()
+    ssh_config_path = Path.home() / ".ssh" / "config"
+    ssh_config.parse(ssh_config_path.open())
+    if len(ssh_config.lookup(TUNNEL_HOST_NAME)) < 2:
+        with ssh_config_path.open("a") as f:
+            f.write(f"""
+Host {TUNNEL_HOST_NAME}
+    HostName localhost
+    User {credentials.username}
+    IdentityFile {private_key_path}
+    Port {local_port}""")
+
     rich.print("[green]Sherlock tunnel setup complete![/green]")
+    tunnel_setup_path.touch()
 
 
 @cli.command(
