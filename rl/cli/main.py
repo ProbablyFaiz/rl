@@ -9,7 +9,6 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 import pexpect  # type: ignore
 import questionary
@@ -17,11 +16,14 @@ import regex
 import rich
 import rich.progress
 import rich.table
+from pydantic import BaseModel
 from strenum import StrEnum
 
 import rl.utils.click as click
 from rl.cli.duo import Duo, DuoConfig
 from rl.cli.nodelist_parser import parse_nodes_str
+
+# region Constants
 
 CURRENT_USER = subprocess.run(
     ["whoami"], stdout=subprocess.PIPE, text=True
@@ -33,6 +35,7 @@ ON_SHERLOCK = Path("/usr/bin/sbatch").exists()
 
 # Must use full path to avoid issues with conda environments
 SSH_PATH = "/bin/ssh"
+SSHD_PATH = "/usr/sbin/sshd"
 
 # Check if fish is installed, otherwise use bash
 SHELL_PATH = (
@@ -62,6 +65,22 @@ NODE_OPTIONS = [
 ]
 
 
+SHERLOCK_HOME_DIR = Path("/home/users") / CURRENT_USER
+SHERLOCK_SSH_DIR = SHERLOCK_HOME_DIR / ".ssh"
+
+_DEFAULT_SSH_SERVER_PORT = 5549
+_DEFAULT_SSH_TUNNEL_PORT = 5549
+
+
+_MFA_LINE_REGEX = regex.compile(
+    r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", regex.IGNORECASE
+)
+
+# endregion
+
+# region Data Structures
+
+
 class RLError(Exception):
     pass
 
@@ -80,6 +99,12 @@ class JobInfo:
     time_remaining: str
 
 
+class Credentials(BaseModel):
+    username: str
+    password: str
+    node: str
+
+
 class JobState(StrEnum):
     RUNNING = "R"
     PENDING = "PD"
@@ -90,24 +115,31 @@ STATE_DISPLAY_MAP = {
     JobState.PENDING: "[yellow]Pending[/yellow]",
 }
 
+# endregion
+
 
 @click.group()
 def cli():
     pass
 
 
-def _requires_duo(func: Callable):
+# region Helpers
+
+
+def _require_duo(func: Callable):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         duo_config = _read_duo()
         if not duo_config:
             raise RLError("Duo not configured. Run `rl configure duo` to configure it.")
+        if "duo" not in kwargs:
+            kwargs["duo"] = Duo.from_config(duo_config)
         return func(*args, **kwargs)
 
     return wrapper
 
 
-def _requires_sherlock_credentials(func: Callable):
+def _require_sherlock_credentials(func: Callable):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         credentials = _read_credentials()
@@ -115,6 +147,8 @@ def _requires_sherlock_credentials(func: Callable):
             raise RLError(
                 "Sherlock credentials not found. Run `rl configure sherlock` to set them."
             )
+        if "credentials" not in kwargs:
+            kwargs["credentials"] = credentials
         return func(*args, **kwargs)
 
     return wrapper
@@ -128,6 +162,41 @@ def _must_run_on_sherlock(func: Callable):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def _read_duo() -> DuoConfig | None:
+    if not DUO_FILE.exists():
+        return None
+    with DUO_FILE.open() as f:
+        return json.load(f)
+
+
+def _write_duo(duo_info: DuoConfig):
+    with DUO_FILE.open("w") as f:
+        json.dump(duo_info, f, indent=2)
+
+
+def _write_credentials(credentials: Credentials):
+    with CREDENTIALS_FILE.open("w") as f:
+        json.dump(credentials.model_dump(), f, indent=2)
+
+
+def _read_credentials() -> Credentials | None:
+    if not CREDENTIALS_FILE.exists():
+        return None
+    with CREDENTIALS_FILE.open() as f:
+        return Credentials.model_validate(json.load(f))
+
+
+@_require_duo
+def approve_duo_login(*, duo: Duo):
+    duo.answer_latest_transaction(approve=True)
+
+
+# endregion
+
+
+# region Jobs
 
 
 @cli.command(
@@ -409,40 +478,6 @@ def _get_all_jobs(partition: str | None = None, show_progress=False):
     return results
 
 
-@cli.command(short_help="Temporarily modify files to avoid Sherlock auto-deletion")
-@click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
-@click.option(
-    "--recursive",
-    "-r",
-    is_flag=True,
-    help="Recursively touch files in a directory, if passed.",
-)
-@_must_run_on_sherlock
-def touch(paths: list[Path], recursive: bool):
-    # Merely 'touch'ing is insufficient; Sherlock requires an actual modification to the file
-    file_paths = []
-    if any(p.is_dir() for p in paths):
-        if not recursive:
-            raise click.ClickException(
-                "You must pass --recursive/-r if you want to recursively touch a directory"
-            )
-        rich.print("[green]Finding all files within directories to touch...[/green]")
-    for path in paths:
-        if path.is_dir():
-            file_paths.extend([p for p in Path(path).rglob("*") if p.is_file()])
-        else:
-            file_paths.append(Path(path))
-
-    with rich.progress.Progress() as progress:
-        task = progress.add_task("[green]Touching files...", total=len(file_paths))
-        for file_path in file_paths:
-            try:
-                _touch_file(file_path)
-            except Exception as e:
-                rich.print(f"[red]Error touching {file_path}: {e}[/red]")
-            progress.update(task, advance=1)
-
-
 def _touch_file(path: Path):
     with path.open("ab") as f:
         f.write(b" ")
@@ -488,6 +523,10 @@ def _select_job() -> str:
     return job_name_id_map[selection]
 
 
+# endregion
+
+
+# region Connections
 @cli.command(help="SSH into Sherlock or into a particular job while on Sherlock")
 @click.argument("node", required=False, type=str)
 def ssh(node: str):
@@ -497,17 +536,105 @@ def ssh(node: str):
         _ssh_within_sherlock(node)
 
 
-@_requires_duo
-@_requires_sherlock_credentials
-def _ssh_into_sherlock(node: str):
-    credentials = cast(dict[str, str], _read_credentials())
-    duo = Duo.from_config(cast(DuoConfig, _read_duo()))
+@cli.command(help="Run an SSH server on Sherlock and tunnel it to your local machine")
+@click.option(
+    "--port",
+    "-p",
+    "local_port",
+    help="Local port to tunnel to",
+    default=_DEFAULT_SSH_TUNNEL_PORT,
+    type=int,
+)
+@click.option(
+    "--remote-port",
+    "-rp",
+    help="Remote port to run the SSH server on",
+    default=_DEFAULT_SSH_SERVER_PORT,
+    type=int,
+)
+@_require_duo
+@_require_sherlock_credentials
+def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: Duo):
+    # /usr/sbin/sshd -f ~/.ssh/sshd_config -h ~/.ssh/user_rsa -p 2222
 
-    node = node or credentials["node"]
+    # TODO: Do the requisite server setup by creating the config, key etc.
+    sshd_config_path = SHERLOCK_SSH_DIR / "sshd_config"
+    user_key_path = SHERLOCK_SSH_DIR / "user_rsa"
+
+    server_command = (
+        f"{SSHD_PATH} -f {sshd_config_path} -h {user_key_path} -p {remote_port}"
+    )
+    common_args = [
+        f"{credentials.username}@{credentials.node}.sherlock.stanford.edu",
+    ]
+    _run_sherlock_ssh(
+        "ssh", common_args + [server_command], credentials=credentials, duo=duo
+    )
+
+    rich.print(
+        f"[green]Tunnel to Sherlock running on {credentials.node} started on localhost:{local_port}[/green]"
+    )
+
+    rich.print(f"[green]Starting tunnel to Sherlock on {credentials.node}...[/green]")
+    rich.print(f"[green]Local port: {local_port}, Remote port: {remote_port}[/green]")
+    rich.print("[yellow]Press Ctrl+C to stop the tunnel[/yellow]")
+
+    try:
+        _run_sherlock_ssh(
+            "ssh",
+            common_args + ["-N", "-L", f"{local_port}:localhost:{remote_port}"],
+            credentials=credentials,
+            duo=duo,
+        )
+    except KeyboardInterrupt:
+        rich.print("\n[red]Tunnel stopped by user[/red]")
+    except Exception as e:
+        rich.print(f"[red]Error: {e}[/red]")
+
+
+@cli.command(
+    help="SCP files to/from Sherlock",
+    context_settings={"ignore_unknown_options": True},
+)
+@click.argument("direction", type=click.Choice(["to", "from"]))
+@click.argument("source", type=str)
+@click.argument("destination", type=str)
+@click.argument("scp_options", nargs=-1, type=str)
+@_require_duo
+@_require_sherlock_credentials
+def scp(
+    direction: str,
+    source: str,
+    destination: str,
+    scp_options: list[str],
+    *,
+    credentials: Credentials,
+    duo: Duo,
+):
+    node = credentials.node
+    node_url = f"{node}.sherlock.stanford.edu"
+    rich.print(f"[green]Logging in to {node_url}[/green]")
+    scp_args = [*scp_options]
+    if direction == "to":
+        scp_args.extend([source, f"{credentials.username}@{node_url}:{destination}"])
+    else:
+        scp_args.extend([f"{credentials.username}@{node_url}:{source}", destination])
+
+    _run_sherlock_ssh("scp", scp_args, credentials=credentials, duo=duo)
+
+
+@_require_duo
+@_require_sherlock_credentials
+def _ssh_into_sherlock(node: str, *, credentials: Credentials, duo: Duo):
+    node = node or credentials.node
     node_url = f"{node}.sherlock.stanford.edu"
     rich.print(f"[green]Logging you in to {node_url}...[/green]")
-    ssh_command = f"ssh -o StrictHostKeyChecking=no {credentials['username']}@{node_url} -t 'fish || bash'"
-    _run_sherlock_ssh(ssh_command, credentials, duo)
+    ssh_args = [
+        f"{credentials.username}@{node_url}",
+        "-t",
+        "fish || bash",
+    ]
+    _run_sherlock_ssh("ssh", ssh_args, credentials=credentials, duo=duo)
 
 
 @_must_run_on_sherlock
@@ -546,41 +673,16 @@ def _select_node() -> str:
     return name_to_node_map[selection]
 
 
-@cli.command(
-    help="SCP files to/from Sherlock",
-    context_settings={"ignore_unknown_options": True},
-)
-@click.argument("direction", type=click.Choice(["to", "from"]))
-@click.argument("source", type=str)
-@click.argument("destination", type=str)
-@click.argument("scp_options", nargs=-1, type=str)
-@_requires_duo
-@_requires_sherlock_credentials
-def scp(direction: str, source: str, destination: str, scp_options: list[str]):
-    credentials = cast(dict[str, str], _read_credentials())
-    duo = Duo.from_config(cast(DuoConfig, _read_duo()))
+@_require_duo
+@_require_sherlock_credentials
+def _run_sherlock_ssh(
+    ssh_command: str, args: list[str], *, credentials: Credentials, duo: Duo
+):
+    args = ["-o", "StrictHostKeyChecking=no", *args]
 
-    node = credentials["node"]
-    node_url = f"{node}.sherlock.stanford.edu"
-    rich.print(f"[green]Logging in to {node_url}[/green]")
-    scp_prefix = "scp -o StrictHostKeyChecking=no"
-    scp_command = (
-        f"{scp_prefix} {' '.join(scp_options)} {source} {credentials['username']}@{node_url}:{destination}"
-        if direction == "to"
-        else f"{scp_prefix} {' '.join(scp_options)} {credentials['username']}@{node_url}:{source} {destination}"
-    )
-    _run_sherlock_ssh(scp_command, credentials, duo)
-
-
-_MFA_LINE_REGEX = regex.compile(
-    r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", regex.IGNORECASE
-)
-
-
-def _run_sherlock_ssh(ssh_command: str, credentials: dict[str, str], duo: Duo):
-    ssh = pexpect.spawn(ssh_command)
+    ssh = pexpect.spawn(ssh_command, args)
     ssh.expect("password:")
-    ssh.sendline(credentials["password"])
+    ssh.sendline(credentials.password)
 
     ssh.expect(r"Passcode or option \(\d+-\d+\): ")
     duo_output = ssh.before.decode()
@@ -622,6 +724,12 @@ def _approve_when_ready(duo: Duo):
     raise RLError("Failed to approve Duo MFA after 10 attempts.")
 
 
+# endregion
+
+
+# region Configuration
+
+
 @cli.group(help="Configure different aspects of rl")
 def configure():
     pass
@@ -650,45 +758,54 @@ def sherlock():
     print(
         f"Selected node {node_choice} for you, you can change this in {CREDENTIALS_FILE}."
     )
-    credentials = {
-        "username": username,
-        "password": password,
-        "node": node_choice,
-    }
+    credentials = Credentials(
+        username=username,
+        password=password,
+        node=node_choice,
+    )
     _write_credentials(credentials)
     print(f"Credentials saved to {CREDENTIALS_FILE}")
 
 
-def approve_duo_login():
-    duo_config = _read_duo()
-    if not duo_config:
-        raise RLError("Duo not configured. Run `rl configure duo` to configure it.")
-    duo = Duo.from_config(duo_config)
-    duo.answer_latest_transaction(approve=True)
+# endregion
 
 
-def _read_duo() -> DuoConfig | None:
-    if not DUO_FILE.exists():
-        return None
-    with DUO_FILE.open() as f:
-        return json.load(f)
+# region File Operations
+@cli.command(short_help="Temporarily modify files to avoid Sherlock auto-deletion")
+@click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--recursive",
+    "-r",
+    is_flag=True,
+    help="Recursively touch files in a directory, if passed.",
+)
+@_must_run_on_sherlock
+def touch(paths: list[Path], recursive: bool):
+    # Merely 'touch'ing is insufficient; Sherlock requires an actual modification to the file
+    file_paths = []
+    if any(p.is_dir() for p in paths):
+        if not recursive:
+            raise click.ClickException(
+                "You must pass --recursive/-r if you want to recursively touch a directory"
+            )
+        rich.print("[green]Finding all files within directories to touch...[/green]")
+    for path in paths:
+        if path.is_dir():
+            file_paths.extend([p for p in Path(path).rglob("*") if p.is_file()])
+        else:
+            file_paths.append(Path(path))
+
+    with rich.progress.Progress() as progress:
+        task = progress.add_task("[green]Touching files...", total=len(file_paths))
+        for file_path in file_paths:
+            try:
+                _touch_file(file_path)
+            except Exception as e:
+                rich.print(f"[red]Error touching {file_path}: {e}[/red]")
+            progress.update(task, advance=1)
 
 
-def _write_duo(duo_info: DuoConfig):
-    with DUO_FILE.open("w") as f:
-        json.dump(duo_info, f, indent=2)
-
-
-def _write_credentials(credentials):
-    with CREDENTIALS_FILE.open("w") as f:
-        json.dump(credentials, f, indent=2)
-
-
-def _read_credentials() -> dict[str, str] | None:
-    if not CREDENTIALS_FILE.exists():
-        return None
-    with CREDENTIALS_FILE.open() as f:
-        return json.load(f)
+# endregion
 
 
 if __name__ == "__main__":
