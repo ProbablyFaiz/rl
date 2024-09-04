@@ -383,6 +383,7 @@ class BatchOpenAIEngine(InferenceEngine):
             time.sleep(5)  # Poll every 5 seconds
             batch = self.client.batches.retrieve(batch.id)
             pbar.n = batch.request_counts.completed
+            pbar.set_postfix(status=batch.status)
             pbar.refresh()
 
         pbar.close()
