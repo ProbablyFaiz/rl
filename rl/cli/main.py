@@ -541,6 +541,14 @@ def ssh(node: str):
 
 @cli.command(help="Run an SSH server on Sherlock and tunnel it to your local machine")
 @click.option(
+    "--host",
+    "-H",
+    "local_host",
+    help="Local host to bind the tunnel to",
+    default="localhost",
+    type=str,
+)
+@click.option(
     "--port",
     "-p",
     "local_port",
@@ -557,7 +565,14 @@ def ssh(node: str):
 )
 @_require_duo
 @_require_sherlock_credentials
-def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: Duo):
+def tunnel(
+    local_host: str,
+    local_port: int,
+    remote_port: int,
+    *,
+    credentials: Credentials,
+    duo: Duo,
+):
     sshd_config_path = SHERLOCK_SSH_DIR / "sshd_config"
     host_key_path = SHERLOCK_SSH_DIR / "host_rsa"
 
@@ -589,7 +604,8 @@ def tunnel(local_port: int, remote_port: int, *, credentials: Credentials, duo: 
     try:
         _run_sherlock_ssh(
             "ssh",
-            common_args + ["-N", "-L", f"{local_port}:localhost:{remote_port}"],
+            common_args
+            + ["-N", "-L", f"{local_host}:{local_port}:localhost:{remote_port}"],
             credentials=credentials,
             duo=duo,
         )
