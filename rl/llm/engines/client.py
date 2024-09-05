@@ -105,6 +105,7 @@ class _OAIClientEngine(ClientEngine, ABC):
                 {tkn.token: tkn.logprob for tkn in pos.top_logprobs}
                 for pos in choice.logprobs.content
             ]
+        return output
 
 
 @register_engine(
