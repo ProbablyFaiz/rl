@@ -29,7 +29,10 @@ class InferenceOutput(BaseModel):
     prompt: InferenceInput
     text: str
 
-    logprobs: list[dict[int, float]] | None = None
+    # TODO: OpenAI gives us logprobs in terms of the string representation of the token
+    # but vLLM gives us logprobs in terms of the token itself. We should probably
+    # standardize on one representation.
+    logprobs: list[dict[int | str, float]] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

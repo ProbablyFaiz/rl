@@ -5,7 +5,7 @@ authors = [
     { name = "Faiz Surani", email = "faiz@law.stanford.edu" },
     { name = "Varun Magesh", email="vim@law.stanford.edu" }
 ]
-description = "A CLI for various RegLab / Sherlock tasks"
+description = "Utilities for various RegLab / Sherlock tasks"
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -25,8 +25,8 @@ dependencies = [
     "python-dotenv",
     "unidecode",
     "StrEnum",
-    "watchdog",
     # TODO: Maybe move into an extra?
+    "watchdog",
     "pydantic>=2",
     "typing-extensions",
     "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
@@ -42,9 +42,9 @@ sherlock = [
     "paramiko",
 ]
 local_llm = [
+    "rl[llm]",
     "transformers>=4.43",
     "torch",
-    "rl[llm]",
     "vllm~=0.5.3post1; platform_system == 'Linux'",
     "peft",
     "trl",

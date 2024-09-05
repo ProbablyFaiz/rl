@@ -44,6 +44,9 @@ class ClientEngine(InferenceEngine, ABC):
         )
 
 
+_NUM_LOGPROBS = 20
+
+
 class _OAIClientEngine(ClientEngine, ABC):
     BASE_URL: str
     API_KEY_NAME: str
@@ -82,16 +85,26 @@ class _OAIClientEngine(ClientEngine, ABC):
             completion_kwargs["max_tokens"] = self.llm_config.max_new_tokens
         if EngineFeature.JSON_OUTPUT in self.enabled_features:
             completion_kwargs["response_format"] = {"type": "json_object"}
+        if EngineFeature.RETURN_LOGPROBS in self.enabled_features:
+            completion_kwargs["logprobs"] = True
+            completion_kwargs["top_logprobs"] = _NUM_LOGPROBS
 
         response = self.client.chat.completions.create(**completion_kwargs)
-        return InferenceOutput(
+        choice = response.choices[0]
+
+        output = InferenceOutput(
             prompt=prompt,  # type: ignore
-            text=response.choices[0].message.content,
+            text=choice.message.content,
             metadata={
                 "model": self.llm_config.model_name_or_path,
                 "base_url": self.BASE_URL,
             },
         )
+        if EngineFeature.RETURN_LOGPROBS in self.enabled_features:
+            output.logprobs = [
+                {tkn.token: tkn.logprob for tkn in pos.top_logprobs}
+                for pos in choice.logprobs.content
+            ]
 
 
 @register_engine(
@@ -107,7 +120,7 @@ class TogetherEngine(_OAIClientEngine):
 @register_engine(
     "openai",
     required_modules=("openai",),
-    supported_features=(EngineFeature.JSON_OUTPUT,),
+    supported_features=(EngineFeature.JSON_OUTPUT, EngineFeature.RETURN_LOGPROBS),
 )
 class OpenAIEngine(_OAIClientEngine):
     BASE_URL = "https://api.openai.com/v1"
@@ -322,7 +335,7 @@ class ModalEngine(InferenceEngine):
 @register_engine(
     "batch_openai",
     required_modules=("openai",),
-    supported_features=(EngineFeature.JSON_OUTPUT,),
+    supported_features=(EngineFeature.JSON_OUTPUT, EngineFeature.RETURN_LOGPROBS),
 )
 class BatchOpenAIEngine(InferenceEngine):
     def __init__(self, llm_config: LLMConfig):
@@ -343,6 +356,8 @@ class BatchOpenAIEngine(InferenceEngine):
         return self.batch_generate([prompt])[0]
 
     def batch_generate(self, prompts: list[ChatInput]) -> list[InferenceOutput]:
+        from openai.types.chat import ChatCompletion
+
         with tempfile.NamedTemporaryFile(
             mode="w+", suffix=".jsonl", delete=False
         ) as temp_file:
@@ -357,6 +372,9 @@ class BatchOpenAIEngine(InferenceEngine):
                     body_kwargs["temperature"] = self.llm_config.temperature
                 if EngineFeature.JSON_OUTPUT in self.enabled_features:
                     body_kwargs["response_format"] = {"type": "json_object"}
+                if EngineFeature.RETURN_LOGPROBS in self.enabled_features:
+                    body_kwargs["logprobs"] = True
+                    body_kwargs["top_logprobs"] = _NUM_LOGPROBS
                 request = {
                     "custom_id": f"request-{i}",
                     "method": "POST",
@@ -396,17 +414,22 @@ class BatchOpenAIEngine(InferenceEngine):
 
         outputs = []
         for result in results:
-            response = result["response"]["body"]
-            outputs.append(
-                InferenceOutput(
-                    prompt=prompts[int(result["custom_id"].split("-")[1])],
-                    text=response["choices"][0]["message"]["content"],
-                    metadata={
-                        "model": self.llm_config.model_name_or_path,
-                        "base_url": "https://api.openai.com/v1",
-                    },
-                )
+            parsed_result = ChatCompletion.model_validate(result["response"]["body"])
+            choice = parsed_result.choices[0]
+            output = InferenceOutput(
+                prompt=prompts[int(result["custom_id"].split("-")[1])],
+                text=choice.message.content,
+                metadata={
+                    "model": self.llm_config.model_name_or_path,
+                    "base_url": "https://api.openai.com/v1",
+                },
             )
+            if EngineFeature.RETURN_LOGPROBS in self.enabled_features:
+                output.logprobs = [
+                    {tkn.token: tkn.logprob for tkn in pos.top_logprobs}
+                    for pos in choice.logprobs.content
+                ]
+            outputs.append(output)
 
         Path(temp_file_path).unlink()
 
