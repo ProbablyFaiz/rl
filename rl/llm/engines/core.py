@@ -377,11 +377,13 @@ def inject_llm_engine(defaults: dict[str, Any] | None):
         @click.option(
             "--json-output",
             is_flag=True,
+            default=defaults.get("json_output", False),
             help="Whether to output the response in JSON format.",
         )
         @click.option(
             "--return-logprobs",
             is_flag=True,
+            default=defaults.get("return_logprobs", False),
             help="Whether to return logprobs in the response.",
         )
         def wrapper(*args, **kwargs):
