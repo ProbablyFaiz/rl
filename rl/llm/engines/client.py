@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 import tempfile
@@ -249,6 +250,8 @@ class AnthropicEngine(ClientEngine):
                 "ClientEngine requires a list of dicts, in the OpenAI API style."
             )
 
+        original_prompt = copy.deepcopy(prompt)
+
         system_prompt = None
         if prompt[0]["role"] == "system":
             system_prompt = prompt[0]["content"]
@@ -261,7 +264,7 @@ class AnthropicEngine(ClientEngine):
             max_tokens=self.llm_config.max_new_tokens,
         )
         return InferenceOutput(
-            prompt=prompt,  # type: ignore
+            prompt=original_prompt,
             text=message.content[0].text,
             metadata={
                 "model": self.llm_config.model_name_or_path,
