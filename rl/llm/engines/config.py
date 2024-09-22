@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from strenum import StrEnum
 
 import rl.utils.io
@@ -13,7 +13,7 @@ class LLMConfig(BaseModel):
     context_window_tokens: int | None = None
     max_new_tokens: int | None = None
     temperature: float = 0.0
-    frequency_penalty: float = Field(0.2, description="Experiment with this")
+    frequency_penalty: float = 0.2  # Experiment with this
 
     json_output: bool = False
     return_logprobs: bool = False

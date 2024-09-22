@@ -222,6 +222,9 @@ class GeminiEngine(InferenceEngine):
         )
 
 
+_WARNED_MAX_TOKENS = False
+
+
 @register_engine("anthropic", required_modules=("anthropic",))
 class AnthropicEngine(ClientEngine):
     BASE_URL = "https://api.anthropic.com/v1"
@@ -257,11 +260,17 @@ class AnthropicEngine(ClientEngine):
             system_prompt = prompt[0]["content"]
             prompt = prompt[1:]
 
+        if self.llm_config.max_new_tokens is None:
+            if not _WARNED_MAX_TOKENS:
+                LOGGER.warning(
+                    "Anthropic requires a max_tokens value. Using 4096 by default. "
+                    "You can override this by setting max_new_tokens in the LLMConfig."
+                )
         message = self.client.messages.create(
             model=self.llm_config.model_name_or_path,
             system=system_prompt,
             messages=prompt,
-            max_tokens=self.llm_config.max_new_tokens,
+            max_tokens=self.llm_config.max_new_tokens or 4096,
         )
         return InferenceOutput(
             prompt=original_prompt,

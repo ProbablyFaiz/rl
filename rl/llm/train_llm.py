@@ -237,7 +237,9 @@ def _get_default_output_dir(name: str) -> Path:
     return _DEFAULT_BASE_OUTPUT_DIR / name
 
 
-def get_dataset(train_data_path: Path, val_data_path: Path) -> datasets.Dataset:
+def get_dataset(
+    train_data_path: Path, val_data_path: Path | None = None
+) -> datasets.Dataset:
     df = pd.read_json(train_data_path, lines=True)
     # Removing the metadata because it causes weird problems when loading the dataset.
     df = df.drop(columns=["metadata"])
