@@ -30,6 +30,8 @@ dependencies = [
     "pydantic>=2",
     "typing-extensions",
     "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
+    "paramiko>=3.4.1",
+    "questionary>=1.10.0",
 ]
 
 [project.optional-dependencies]
