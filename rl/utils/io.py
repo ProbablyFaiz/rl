@@ -9,6 +9,7 @@ from typing import Any
 import dotenv
 import requests
 import tqdm
+from pydantic import BaseModel
 
 DOTENV_LOADED = False
 
@@ -98,7 +99,12 @@ def write_jsonl(filename: str | Path, records: Iterable[Any], overwrite=False) -
         raise ValueError(f"{filename} already exists and overwrite is not set.")
     with filename.open("w") as f:
         for record in records:
-            f.write(json.dumps(record) + "\n")
+            json_record: str
+            if isinstance(record, BaseModel):
+                json_record = record.model_dump_json()
+            else:
+                json_record = json.dumps(record)
+            f.write(json_record + "\n")
 
 
 def write_jsonl_spark(filename: str | Path, df, overwrite=False) -> None:
