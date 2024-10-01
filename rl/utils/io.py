@@ -161,6 +161,12 @@ def write_csv(
 
 
 def download(url: str, dest: str | Path) -> None:
+    """Download a file from a URL to a destination path, with a progress bar.
+
+    Args:
+        url: The URL to download from.
+        dest: The destination path.
+    """
     dest = Path(dest)
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get("content-length", 0))

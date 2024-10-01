@@ -1,4 +1,5 @@
 import datetime
+import gc
 import math
 import os
 import socket
@@ -377,7 +378,19 @@ class VLLMEngine(InferenceEngine):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        import torch
+        import torch.distributed
+        from vllm.model_executor.parallel_utils.parallel_state import (
+            destroy_model_parallel,
+        )
+
+        LOGGER.info("Unloading VLLM model from GPU memory...")
+        destroy_model_parallel()
         del self.vllm
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.distributed.destroy_process_group()
+        LOGGER.info("VLLM model unloaded.")
 
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
         return self.batch_generate([prompt])[0]
