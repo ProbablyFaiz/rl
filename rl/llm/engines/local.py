@@ -380,12 +380,15 @@ class VLLMEngine(InferenceEngine):
     def __exit__(self, exc_type, exc_value, traceback):
         import torch
         import torch.distributed
-        from vllm.model_executor.parallel_utils.parallel_state import (
+        from vllm.distributed.parallel_state import (
+            destroy_distributed_environment,
             destroy_model_parallel,
         )
 
         LOGGER.info("Unloading VLLM model from GPU memory...")
         destroy_model_parallel()
+        destroy_distributed_environment()
+        del self.vllm.model_executor
         del self.vllm
         gc.collect()
         torch.cuda.empty_cache()
