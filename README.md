@@ -1,4 +1,4 @@
-# RL — RegLab / Sherlock utilities
+# RL — Research Utilities
 
 RL is a Python library which provides several things:
 - A set of utilities commonly required in Python research codebases, including:
