@@ -41,7 +41,7 @@ uv tool install "rl[sherlock] @ git+https://github.com/ProbablyFaiz/rl.git@v0.9.
 > *TODO: Add visual instructions for setting up Duo.*
 
 - Go to Duo Central. Add a device with a phone number of the form `[some area code]-555-0199` (this is a
-  [reserved fake number](https://arc.net/l/quote/fbclpupw)). If you are asked to confirm the phone number via SMS,
+  [reserved dummy number](https://arc.net/l/quote/fbclpupw)). If you are asked to confirm the phone number via SMS,
   exit, delete the device, and try a different area code. Duo only prompts for verification if the number has
   been used previously, so you can keep trying different area codes until you find one that works.
 - When Duo shows you the QR code, right click and copy its image address.
