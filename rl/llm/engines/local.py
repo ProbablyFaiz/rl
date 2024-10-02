@@ -392,7 +392,6 @@ class VLLMEngine(InferenceEngine):
         del self.vllm
         gc.collect()
         torch.cuda.empty_cache()
-        torch.distributed.destroy_process_group()
         LOGGER.info("VLLM model unloaded.")
 
     def generate(self, prompt: InferenceInput) -> InferenceOutput:
