@@ -21,18 +21,20 @@ dependencies = [
     "tqdm",
     "ipdb",
     "requests",
-    "regex",
     "python-dotenv",
-    "unidecode",
     "StrEnum",
-    # TODO: Maybe move into an extra?
-    "watchdog",
     "pydantic>=2",
     "typing-extensions",
-    "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
 ]
 
 [project.optional-dependencies]
+segmenter = [
+    "unidecode",
+    "legal-segmenter @ git+https://github.com/lexeme-dev/legal-segmenter@main",
+]
+devsync = [
+    "watchdog",
+]
 sherlock = [
     "pexpect",
     "pyotp",

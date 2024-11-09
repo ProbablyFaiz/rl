@@ -1,8 +1,7 @@
 import collections
+import re
 from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
-
-import regex
 
 import rl.utils.io
 
@@ -31,7 +30,7 @@ def dig(d: dict, *keys: str) -> Any:
     return d
 
 
-def safe_extract(pattern: regex.Pattern, text: str, key: str) -> str | None:
+def safe_extract(pattern: re.Pattern, text: str, key: str) -> str | None:
     match = pattern.search(text)
     if match:
         return match.group(key)

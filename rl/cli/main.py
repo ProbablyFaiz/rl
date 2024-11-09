@@ -3,6 +3,7 @@ import functools
 import json
 import os
 import random
+import re
 import subprocess
 import threading
 import time
@@ -13,7 +14,6 @@ from pathlib import Path
 import paramiko
 import pexpect  # type: ignore
 import questionary
-import regex
 import rich
 import rich.progress
 import rich.table
@@ -75,8 +75,8 @@ _DEFAULT_SSH_SERVER_PORT = 5549
 _DEFAULT_SSH_TUNNEL_PORT = 5549
 
 
-_MFA_LINE_REGEX = regex.compile(
-    r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", regex.IGNORECASE
+_MFA_LINE_REGEX = re.compile(
+    r"\s*(?P<number>\d+)\. Duo Push to XXX-XXX-0199\s*", re.IGNORECASE
 )
 
 # endregion

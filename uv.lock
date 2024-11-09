@@ -2952,23 +2952,20 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "ipdb" },
-    { name = "legal-segmenter" },
-    { name = "paramiko" },
     { name = "pydantic" },
     { name = "python-dotenv" },
-    { name = "questionary" },
-    { name = "regex" },
     { name = "requests" },
     { name = "rich" },
     { name = "rich-click" },
     { name = "strenum" },
     { name = "tqdm" },
     { name = "typing-extensions" },
-    { name = "unidecode" },
-    { name = "watchdog" },
 ]
 
 [package.optional-dependencies]
+devsync = [
+    { name = "watchdog" },
+]
 llm = [
     { name = "anthropic" },
     { name = "google-generativeai" },
@@ -2993,6 +2990,10 @@ local-llm = [
 plot = [
     { name = "matplotlib" },
     { name = "pandas" },
+]
+segmenter = [
+    { name = "legal-segmenter" },
+    { name = "unidecode" },
 ]
 sherlock = [
     { name = "appdirs" },
@@ -3026,13 +3027,12 @@ requires-dist = [
     { name = "google-generativeai", marker = "extra == 'llm'" },
     { name = "huggingface-hub", marker = "extra == 'local-llm'" },
     { name = "ipdb" },
-    { name = "legal-segmenter", git = "https://github.com/lexeme-dev/legal-segmenter?rev=main" },
+    { name = "legal-segmenter", marker = "extra == 'segmenter'", git = "https://github.com/lexeme-dev/legal-segmenter?rev=main" },
     { name = "matplotlib", marker = "extra == 'plot'" },
     { name = "modal", marker = "extra == 'llm'" },
     { name = "openai", marker = "extra == 'llm'" },
     { name = "pandas", marker = "extra == 'local-llm'" },
     { name = "pandas", marker = "extra == 'plot'" },
-    { name = "paramiko", specifier = ">=3.4.1" },
     { name = "paramiko", marker = "extra == 'sherlock'" },
     { name = "peft", marker = "extra == 'local-llm'" },
     { name = "pexpect", marker = "extra == 'sherlock'" },
@@ -3041,9 +3041,7 @@ requires-dist = [
     { name = "pyotp", marker = "extra == 'sherlock'" },
     { name = "pyspark", marker = "extra == 'spark'" },
     { name = "python-dotenv" },
-    { name = "questionary", specifier = ">=1.10.0" },
     { name = "questionary", marker = "extra == 'sherlock'" },
-    { name = "regex" },
     { name = "requests" },
     { name = "rich" },
     { name = "rich-click" },
@@ -3054,10 +3052,10 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'local-llm'", specifier = ">=4.43" },
     { name = "trl", marker = "extra == 'local-llm'" },
     { name = "typing-extensions" },
-    { name = "unidecode" },
+    { name = "unidecode", marker = "extra == 'segmenter'" },
     { name = "vllm", marker = "platform_system == 'Linux' and extra == 'local-llm'", specifier = "~=0.5.3.post1" },
     { name = "wandb", marker = "extra == 'local-llm'" },
-    { name = "watchdog" },
+    { name = "watchdog", marker = "extra == 'devsync'" },
 ]
 
 [package.metadata.requires-dev]
