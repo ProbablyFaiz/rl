@@ -482,8 +482,7 @@ def _get_all_jobs(partition: str | None = None, show_progress=False):
 
 
 def _touch_file(path: Path):
-    with path.open("ab") as f:
-        f.write(b" ")
+    subprocess.run(["truncate", "-s", "+1", str(path)])
     subprocess.run(["truncate", "-s", "-1", str(path)])
 
 
