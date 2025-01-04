@@ -61,6 +61,9 @@ llm = [
     "openai",
     "google-generativeai",
 ]
+bucket = [
+    "s3fs",
+]
 spark = [
     "pyspark",
 ]
