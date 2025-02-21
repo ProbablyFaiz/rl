@@ -15,6 +15,7 @@ import paramiko
 import pexpect  # type: ignore
 import questionary
 import rich
+import rich.markup
 import rich.progress
 import rich.table
 from pydantic import BaseModel
@@ -196,6 +197,11 @@ def approve_duo_login(*, duo: Duo):
     duo.answer_latest_transaction(approve=True)
 
 
+def _log_command(command: list[str]):
+    command_str = rich.markup.escape(" ".join(command))
+    rich.print(f"[bold]>[/bold] [green]{command_str}[/green]")
+
+
 # endregion
 
 
@@ -340,15 +346,14 @@ def job(
         create_batch_job(common_args, name, time)
     else:
         rich.print("[green]Starting interactive job...[/green]")
-        # Show the output to the user
-        subprocess.run(
-            [
-                "srun",
-                *common_args,
-                "--pty",
-                command or SHELL_PATH,
-            ]
-        )
+        full_args = [
+            "srun",
+            *common_args,
+            "--pty",
+            command or SHELL_PATH,
+        ]
+        _log_command(full_args)
+        subprocess.run(full_args, check=True)
 
 
 def _list_jobs(partition: str | None = None):
@@ -392,6 +397,7 @@ def create_batch_job(sbatch_args, name, job_time):
         "--wrap",
         f"tmux new-session -d -s rl && python -c 'import time; time.sleep({sleep_time})'",
     ]
+    _log_command(sbatch_args)
     subprocess.run(sbatch_args, check=True)
 
     curr_job: JobInfo | None
@@ -442,6 +448,7 @@ def _get_all_jobs(partition: str | None = None, show_progress=False):
     else:
         squeue_command.extend(["-u", CURRENT_USER])
 
+    _log_command(squeue_command)
     output = subprocess.run(
         squeue_command,
         stdout=subprocess.PIPE,
@@ -505,8 +512,9 @@ def cancel(job_id: str, yes: bool):
     if not job_id:
         job_id = _select_job()
     if yes or click.confirm(f"Are you sure you want to cancel job {job_id}?"):
+        _log_command(["scancel", job_id])
         subprocess.run(["scancel", job_id])
-    rich.print(f"[red]Job {job_id} cancelled[/red]")
+        rich.print(f"[red]Job {job_id} cancelled[/red]")
 
 
 def _select_job() -> str:
