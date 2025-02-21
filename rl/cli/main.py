@@ -4,6 +4,7 @@ import json
 import os
 import random
 import re
+import shlex
 import subprocess
 import threading
 import time
@@ -198,7 +199,7 @@ def approve_duo_login(*, duo: Duo):
 
 
 def _log_command(command: list[str]):
-    command_str = rich.markup.escape(" ".join(command))
+    command_str = rich.markup.escape(shlex.join(command))
     rich.print(f"[bold]>[/bold] [green]{command_str}[/green]")
 
 
