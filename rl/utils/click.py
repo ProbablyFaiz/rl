@@ -6,24 +6,21 @@ import rich_click
 from rich.console import Console
 from rich.traceback import Traceback
 
-import rl.utils.io
-
-_RICH_TRACEBACK = rl.utils.io.getenv("RL_RICH_TRACEBACK", "0") == "1"
-_DEBUG = rl.utils.io.getenv("RL_DEBUG", "1") == "1"
+import rl.utils.flags
 
 
 def excepthook(type, value, tb):
     if issubclass(type, KeyboardInterrupt):
         sys.__excepthook__(type, value, tb)
         return
-    if _RICH_TRACEBACK:
+    if rl.utils.flags.get_rich_traceback():
         traceback_console = Console(stderr=True)
         traceback_console.print(
             Traceback.from_exception(type, value, tb),
         )
     else:
         traceback.print_exception(type, value, tb)
-    if _DEBUG:
+    if rl.utils.flags.get_debug_mode():
         ipdb.post_mortem(tb)
 
 

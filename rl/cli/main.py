@@ -25,6 +25,9 @@ from strenum import StrEnum
 import rl.utils.click as click
 from rl.cli.duo import Duo, DuoConfig
 from rl.cli.nodelist_parser import parse_nodes_str
+from rl.utils.flags import set_debug_mode
+
+set_debug_mode(False)
 
 # region Constants
 
@@ -322,7 +325,7 @@ def job(
         partition,
         "--job-name",
         name,
-        "--cpus-per-gpu" if gpus else "--cpus-per-task",
+        "-c" if gpus else "--cpus-per-task",
         str(cpus),
         "--mem",
         mem,
@@ -396,7 +399,7 @@ def create_batch_job(sbatch_args, name, job_time):
         f"{LOG_DIR}/{name}.err",
         *sbatch_args,
         "--wrap",
-        f"tmux new-session -d -s rl && python -c 'import time; time.sleep({sleep_time})'",
+        f"tmux new-session -d -s rl && python -c 'import time; sleep_time = {sleep_time}; time.sleep(sleep_time)'",
     ]
     _log_command(sbatch_args)
     subprocess.run(sbatch_args, check=True)
@@ -508,13 +511,36 @@ def approve():
     is_flag=True,
     help="Skip the confirmation prompt",
 )
+@click.option(
+    "--all",
+    "-a",
+    is_flag=True,
+    help="Cancel all running jobs",
+)
 @_must_run_on_sherlock
-def cancel(job_id: str, yes: bool):
+def cancel(job_id: str, yes: bool, all: bool):
+    if all:
+        jobs = _get_all_jobs(show_progress=True)
+        if not jobs:
+            rich.print("[yellow]No jobs found to cancel[/yellow]")
+            return
+        job_ids = [job.job_id for job in jobs]
+        if yes or click.confirm(
+            f"Are you sure you want to cancel {len(job_ids)} jobs?"
+        ):
+            for job_id in job_ids:
+                command = ["scancel", job_id]
+                _log_command(command)
+                subprocess.run(command)
+            rich.print(f"[red]Cancelled {len(job_ids)} jobs[/red]")
+        return
+
     if not job_id:
         job_id = _select_job()
     if yes or click.confirm(f"Are you sure you want to cancel job {job_id}?"):
-        _log_command(["scancel", job_id])
-        subprocess.run(["scancel", job_id])
+        command = ["scancel", job_id]
+        _log_command(command)
+        subprocess.run(command)
         rich.print(f"[red]Job {job_id} cancelled[/red]")
 
 
