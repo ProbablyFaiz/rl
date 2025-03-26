@@ -71,4 +71,7 @@ def parallel_map(
     elif mode == "process":
         return process_map(fn, *iterables, **tqdm_kwargs)
     else:
+        if "max_workers" in tqdm_kwargs:
+            tqdm_kwargs = tqdm_kwargs.copy()
+            tqdm_kwargs.pop("max_workers")
         return list(tqdm.tqdm(map(fn, *iterables), **tqdm_kwargs))
