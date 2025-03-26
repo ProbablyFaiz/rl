@@ -26,7 +26,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Then, on both your local machine and Sherlock (or either one, if you just want some features):
 ```
-uv tool install "rl[sherlock] @ git+https://github.com/ProbablyFaiz/rl.git@v0.9.0"
+uv tool install "rl[sherlock] @ git+https://github.com/ProbablyFaiz/rl.git@v0.11.0"
 ```
 
 ## Setup
