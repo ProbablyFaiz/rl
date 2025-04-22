@@ -141,7 +141,7 @@ class GroqEngine(_OAIClientEngine):
 
 @register_engine(
     "gemini",
-    required_modules=("google.generativeai",),
+    required_modules=("google.genai",),
     supported_features={EngineFeature.JSON_OUTPUT},
 )
 class GeminiEngine(InferenceEngine):
@@ -149,47 +149,59 @@ class GeminiEngine(InferenceEngine):
         super().__init__(llm_config)
 
     def __enter__(self):
-        import google.generativeai as genai
+        from google import genai
 
-        genai.configure(api_key=rl.utils.io.getenv("GEMINI_API_KEY"))
+        self.client = genai.Client(api_key=rl.utils.io.getenv("GEMINI_API_KEY"))
         return self
 
     def generate(self, prompt: ChatInput) -> InferenceOutput:
-        import google.generativeai as genai
-        from google.generativeai.types import HarmBlockThreshold, HarmCategory
+        from google.genai import types
 
-        if not isinstance(prompt, list):
-            raise ValueError(
-                "ClientEngine requires a list of dicts, in the Gemini API style."
+        # Convert OpenAI format to Gemini format
+        contents = []
+        for message in prompt:
+            role = message["role"]
+            # Map OpenAI roles to Gemini roles
+            if role == "system":
+                # System messages in Gemini are handled differently
+                continue
+            elif role == "assistant":
+                gemini_role = "model"
+            else:
+                gemini_role = role
+
+            contents.append(
+                types.Content(
+                    role=gemini_role,
+                    parts=[types.Part.from_text(text=message["content"])],
+                )
             )
-        system_message, prev_messages, last_message = self._convert_openai_to_gemini(
-            prompt
+
+        # Handle system message if present
+        generation_config = types.GenerateContentConfig(
+            temperature=self.llm_config.temperature,
         )
-        # One might reasonably ask, why not initialize the model in __enter__?
-        #  Well, I'll tell you: Google's moronic abstraction requires you to
-        #  pass the system instruction when *initializing* the model object,
-        #  because that makes sense.
-        model = genai.GenerativeModel(
-            model_name=self.llm_config.model_name_or_path,
-            generation_config={
-                "temperature": self.llm_config.temperature,
-                "max_output_tokens": self.llm_config.max_new_tokens,
-                "response_mime_type": "application/json"
-                if self.llm_config.json_output
-                else "text/plain",
-            },
-            system_instruction=system_message,
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            },
+
+        if self.llm_config.max_new_tokens is not None:
+            generation_config.max_output_tokens = self.llm_config.max_new_tokens
+
+        if EngineFeature.JSON_OUTPUT in self.enabled_features:
+            generation_config.response_mime_type = "application/json"
+
+        # Extract system message if present
+        system_instruction = None
+        if prompt and prompt[0]["role"] == "system":
+            system_instruction = prompt[0]["content"]
+
+        if system_instruction:
+            generation_config.system_instruction = system_instruction
+
+        # Generate response using the new SDK
+        response = self.client.models.generate_content(
+            model=self.llm_config.model_name_or_path,
+            contents=contents,
+            config=generation_config,
         )
-        chat_session = model.start_chat(history=prev_messages)
-        # Can't include the last message in the history, because
-        #  that would make too much sense!
-        response = chat_session.send_message(last_message)
 
         return InferenceOutput(
             prompt=prompt,
@@ -197,28 +209,6 @@ class GeminiEngine(InferenceEngine):
             metadata={
                 "model": self.llm_config.model_name_or_path,
             },
-        )
-
-    def _convert_openai_to_gemini(
-        self, prompt: ChatInput
-    ) -> tuple[str | None, list, str]:
-        """Returns the system instruction, the previous messages, and the last message in the Gemini format."""
-        system_prompt = None
-        if prompt and prompt[0]["role"] == "system":
-            system_prompt = prompt[0]["content"]
-            prompt = prompt[1:]
-        last_message = prompt[-1]["content"]
-        prompt = prompt[:-1]
-        return (
-            system_prompt,
-            [
-                {
-                    "role": "model" if msg["role"] == "assistant" else msg["role"],
-                    "parts": [msg["content"]],
-                }
-                for msg in prompt
-            ],
-            last_message,
         )
 
 

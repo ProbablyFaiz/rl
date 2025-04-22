@@ -59,7 +59,7 @@ llm = [
     "modal",
     "anthropic",
     "openai",
-    "google-generativeai",
+    "google-genai",
 ]
 bucket = [
     "s3fs",
