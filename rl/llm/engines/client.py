@@ -211,6 +211,13 @@ class GeminiEngine(InferenceEngine):
             },
         )
 
+    def batch_generate(self, prompts: list[ChatInput]) -> list[InferenceOutput]:
+        return thread_map(
+            self.generate,
+            prompts,
+            max_workers=int(rl.utils.io.getenv("RL_MAX_WORKERS", 10)),
+        )
+
 
 _WARNED_MAX_TOKENS = False
 
