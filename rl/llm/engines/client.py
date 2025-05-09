@@ -182,11 +182,16 @@ class GeminiEngine(InferenceEngine):
 
         # Handle system message if present
         generation_config = types.GenerateContentConfig(
-            temperature=self.llm_config.temperature,
+            # temperature=self.llm_config.temperature,
         )
 
         if self.llm_config.max_new_tokens is not None:
             generation_config.max_output_tokens = self.llm_config.max_new_tokens
+        if "2.5" in self.llm_config.model_name_or_path:
+            generation_config.thinking_config = types.ThinkingConfig(
+                include_thoughts=False,
+                thinking_budget=0,
+            )
 
         if EngineFeature.JSON_OUTPUT in self.enabled_features:
             generation_config.response_mime_type = "application/json"
