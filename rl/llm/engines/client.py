@@ -211,6 +211,7 @@ class GeminiEngine(InferenceEngine):
             text=response.text,
             metadata={
                 "model": self.llm_config.model_name_or_path,
+                "usage_metadata": response.usage_metadata.model_dump(),
             },
         )
 
