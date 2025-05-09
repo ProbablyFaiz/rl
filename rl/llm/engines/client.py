@@ -153,7 +153,7 @@ class GeminiEngine(InferenceEngine):
 
         self.client = genai.Client(
             api_key=rl.utils.io.getenv("GEMINI_API_KEY"),
-            http_options={"timeout": 120},
+            http_options={"timeout": 120 * 1000},
         )
         return self
 
