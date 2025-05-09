@@ -151,7 +151,10 @@ class GeminiEngine(InferenceEngine):
     def __enter__(self):
         from google import genai
 
-        self.client = genai.Client(api_key=rl.utils.io.getenv("GEMINI_API_KEY"))
+        self.client = genai.Client(
+            api_key=rl.utils.io.getenv("GEMINI_API_KEY"),
+            http_options={"timeout": 120},
+        )
         return self
 
     def generate(self, prompt: ChatInput) -> InferenceOutput:
