@@ -377,9 +377,15 @@ class BatchOpenAIEngine(InferenceEngine):
         )
         return self.batch_generate([prompt])[0]
 
-    def batch_generate(self, prompts: list[ChatInput]) -> list[InferenceOutput]:
-        from openai.types.chat import ChatCompletion
-
+    def start_batch(self, prompts: list[ChatInput]) -> "openai.types.Batch":
+        """Start a batch job and return the batch object.
+        
+        Args:
+            prompts: List of chat inputs to process in the batch.
+            
+        Returns:
+            The OpenAI Batch object representing the started batch job.
+        """
         with tempfile.NamedTemporaryFile(
             mode="w+", suffix=".jsonl", delete=False
         ) as temp_file:
@@ -417,20 +423,43 @@ class BatchOpenAIEngine(InferenceEngine):
             endpoint="/v1/chat/completions",
             completion_window="24h",
         )
+        
+        # Clean up temp file
+        Path(temp_file_path).unlink()
+        
+        return batch
 
-        pbar = tqdm.tqdm(total=len(prompts), desc="Polling batch status")
-        while batch.status not in ["completed", "failed", "expired"]:
-            time.sleep(5)  # Poll every 5 seconds
-            batch = self.client.batches.retrieve(batch.id)
-            pbar.n = batch.request_counts.completed
-            pbar.set_postfix(status=batch.status)
-            pbar.refresh()
+    def retrieve_batch(self, batch_id: str) -> list[InferenceOutput]:
+        """Retrieve a completed batch and return the results.
+        
+        Args:
+            batch_id: The ID of the batch to retrieve.
+            
+        Returns:
+            List of InferenceOutput objects from the completed batch.
+            
+        Raises:
+            RuntimeError: If the batch is not in completed status.
+        """
+        from openai.types.chat import ChatCompletion
 
-        pbar.close()
-
+        # Retrieve the batch
+        batch = self.client.batches.retrieve(batch_id)
+        
+        # Check status
         if batch.status != "completed":
-            raise RuntimeError(f"Batch failed with status: {batch.status}")
-
+            raise RuntimeError(f"Batch {batch_id} is not completed. Status: {batch.status}")
+        
+        # Fetch the input file to recreate prompts
+        input_file = self.client.files.content(batch.input_file_id)
+        input_requests = [json.loads(line) for line in input_file.text.strip().split("\n")]
+        
+        # Recreate prompts from input requests
+        prompts = []
+        for request in input_requests:
+            prompts.append(request["body"]["messages"])
+        
+        # Fetch the output file and process results
         output_file = self.client.files.content(batch.output_file_id)
         results = [json.loads(line) for line in output_file.text.strip().split("\n")]
 
@@ -438,8 +467,9 @@ class BatchOpenAIEngine(InferenceEngine):
         for result in results:
             parsed_result = ChatCompletion.model_validate(result["response"]["body"])
             choice = parsed_result.choices[0]
+            custom_id_index = int(result["custom_id"].split("-")[1])
             output = InferenceOutput(
-                prompt=prompts[int(result["custom_id"].split("-")[1])],
+                prompt=prompts[custom_id_index],
                 text=choice.message.content,
                 metadata={
                     "model": self.llm_config.model_name_or_path,
@@ -453,6 +483,33 @@ class BatchOpenAIEngine(InferenceEngine):
                 ]
             outputs.append(output)
 
-        Path(temp_file_path).unlink()
-
         return outputs
+
+    def check_batch_status(self, batch_id: str) -> "openai.types.Batch":
+        """Check the status of a batch and return the batch object.
+        
+        Args:
+            batch_id: The ID of the batch to check.
+            
+        Returns:
+            The updated batch object with current status.
+        """
+        return self.client.batches.retrieve(batch_id)
+
+    def batch_generate(self, prompts: list[ChatInput]) -> list[InferenceOutput]:
+        batch = self.start_batch(prompts)
+
+        pbar = tqdm.tqdm(total=len(prompts), desc="Polling batch status")
+        while batch.status not in ["completed", "failed", "expired"]:
+            time.sleep(5)  # Poll every 5 seconds
+            batch = self.check_batch_status(batch.id)
+            pbar.n = batch.request_counts.completed
+            pbar.set_postfix(status=batch.status)
+            pbar.refresh()
+
+        pbar.close()
+
+        if batch.status != "completed":
+            raise RuntimeError(f"Batch failed with status: {batch.status}")
+
+        return self.retrieve_batch(batch.id)
